@@ -13,19 +13,28 @@ with `expo-router`.
   where-to-watch providers, friends' activity, like/watchlist/log actions,
   add-to-showcase, comments
 - Person detail: bio + filmography, linked from cast/crew
-- Log a watch: 5-category star ratings, review text, rewatch/spoiler flags
+- Log a watch: 5-category star ratings, review text, an optional memorable
+  quote (unlocks a shareable quote card for that log), rewatch/spoiler flags
+- Quote-only posts: a separate "Quote" button on the film page (next to "Log
+  & review") opens a lightweight quote-only screen — just the quote text and
+  a mood category (funny, romantic, philosophical, sad, motivational, dark,
+  iconic), no rating or review required. Fully independent of the full log
+  flow, so a film can have both a review and a standalone quote from the same
+  person
 - Showcases: browse public showcases, create your own (ranked or not,
   public/private, tags), edit a showcase's details, add films from inside the
   showcase itself (not just from the film page), remove films, and — for
   ranked showcases — long-press a film and drag to reorder the list
-- Community: activity feed of reviews (everyone / people you follow), like,
-  expand-in-place comments, share a review as an image
+- Community: activity feed split into Reviews and Quotes tabs (each further
+  filterable by everyone / people you follow), with a search box in each tab
+  (searches review text or quote text) and mood-category chips in the Quotes
+  tab; like, expand-in-place comments, share a review or quote as an image
 - Comments: threaded (one level of replies) on films, showcases, and logs,
   with @mention autocomplete (users and cast/crew) — tap a mention to jump to
   their profile or person page
 - Share cards: turn a review into a quote card or a review card (poster +
-  rating + snippet), then save it to your photo library or open the native
-  share sheet
+  rating + snippet), swap in a custom cover photo if you want, then save it
+  to your photo library or open the native share sheet
 - Social: follow/unfollow, followers/following lists, notifications (likes,
   comments, follows, mentions) with an unread badge
 - Profile: tap your avatar to take or pick a new profile photo, pick up to 5
@@ -76,6 +85,10 @@ needed). Two one-time steps in `showcase-api`:
    load back on the phone, the same `127.0.0.1`-class issue as the API URL
    above.
 
+A new migration also shipped this round (`quote_category` on `logs`, for the
+quote-only posting feature below) — run `php artisan migrate` in
+`showcase-api` before trying it.
+
 ## Notes / simplifications
 
 - RTL layout isn't fully mirrored (React Native's RTL flip requires a full
@@ -110,11 +123,54 @@ needed). Two one-time steps in `showcase-api`:
   in, same as the rest of the app.
 
 Since new native modules were added this round (avatar picking needs
-`expo-image-picker`, on top of last round's drag-and-drop packages), run
-`npm install` again before restarting Expo — same as any time `package.json`
-changes.
+`expo-image-picker` and `expo-image-manipulator`, on top of last round's
+drag-and-drop packages), run `npm install` again before restarting Expo —
+same as any time `package.json` changes.
 
-## Fixes (latest round)
+## New this round: quotes split from reviews
+
+- **Quote-only posting.** The film page now has two inline buttons: the
+  existing "Log & review" and a new "Quote" button. Quote opens a dedicated
+  screen (`app/quote/[tmdbId].tsx`) with just a quote text field and a
+  single-select mood category (Funny, Romantic, Philosophical, Sad,
+  Motivational, Dark, Iconic) — no stars, no review. It posts to the same
+  `/logs` endpoint as a standalone log entry, so it's fully independent of
+  the full log flow: a user can still add a quote alongside a rated review
+  from the log screen, or post one from the film page anytime, and both can
+  coexist for the same film.
+- **Backend: `quote_category`.** New nullable `quote_category` column on
+  `logs` (migration `2026_07_29_090000_add_quote_category_to_logs_table`),
+  validated against a fixed list in `StoreLogRequest`, and exposed through
+  `LogResource`. `GET /logs` gained `type` (`quote`/`review`), `category`,
+  and `search` query params so the feed can filter/search by content type.
+- **Community: Reviews/Quotes tabs.** Community now has a top-level
+  Reviews/Quotes toggle (in addition to the existing Everyone/Following
+  toggle), a search box that searches review text or quote text depending on
+  the active tab, and — in the Quotes tab — category filter chips. A log
+  with both a review and a quote shows up in both tabs, displaying whichever
+  text matches that tab. Card design is unchanged from before.
+
+## Fixes (this round)
+
+- **Avatar upload still failing after the previous fix.** The prior fix
+  re-encoded the picked photo through `expo-image-manipulator` before
+  upload, but that re-encode step is itself a native module call that can
+  fail on some devices/URIs — when it did, the generic "Upload failed /
+  Please try again" you saw was actually that failure, not a network error
+  (the alert only showed a real message for server-side `ApiError`s, so a
+  manipulator crash fell through to a blank fallback string). Now: if the
+  resize/re-encode step throws, the app falls back to uploading the original
+  picked file instead of aborting, and the failure alert shows the real
+  underlying error message either way, so if it fails again the message
+  itself will say why.
+- **Camera badge invisible on the avatar.** The small camera icon was drawn
+  *inside* the same circular view that clips the avatar photo to a circle —
+  its bottom-right corner position was exactly the area that circular
+  `overflow: hidden` cuts away, so it was always invisible. It's now drawn
+  in a sibling wrapper outside the clipped circle, sitting right on the
+  avatar's edge instead of being swallowed by it.
+
+## Fixes (previous round)
 
 - **Follow button / following count not updating.** `UserResource`,
   `CommentResource`, and `LogResource` were resolving the viewer with
@@ -144,3 +200,24 @@ changes.
   picked up, so it's obvious you're in reorder mode, and the long-press
   threshold is a slightly more deliberate 350ms so it doesn't trigger during
   a normal tap-to-open.
+- **Avatar upload failing with "Network request failed."** Photos picked
+  from the camera roll can come back as a `content://` URI on Android, which
+  React Native's networking layer can fail to attach to a multipart request
+  — the request never reaches the server at all, so there's no useful error
+  from the API side. The picked photo is now re-encoded through
+  `expo-image-manipulator` (resized to 640×640, recompressed to JPEG) before
+  upload, which both normalizes it to a plain local file the uploader can
+  read reliably and shrinks it for a faster, safer transfer. The avatar
+  upload's timeout was also bumped from 10s to 30s, since a multipart upload
+  legitimately takes longer than a typical JSON call.
+- **No way to add a quote.** The log form only had a "Review" field — there
+  was no input for `quote` at all, so a quote card could never be unlocked
+  from the mobile app. Added a dedicated "memorable quote" field (matching
+  the web app's log dialog) below the review field.
+- **Only the review card's cover could change; quote card text wasn't
+  centered.** Added a "Change cover" button in the share sheet (camera or
+  photo library) that swaps the backdrop image on whichever card style is
+  currently shown. Also fixed the quote card specifically: the quote text
+  now centers both horizontally and vertically in the space below the
+  cover image, and the showcase logo at the bottom is horizontally centered
+  instead of pinned to the left. The review card's layout is unchanged.

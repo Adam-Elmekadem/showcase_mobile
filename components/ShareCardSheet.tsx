@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, Modal, Pressable, ActivityIndicator, StyleSheet, ScrollView } from "react-native";
+import { View, Text, Modal, Pressable, ActivityIndicator, StyleSheet, ScrollView, Alert } from "react-native";
 import Constants, { AppOwnership } from "expo-constants";
 import { Ionicons } from "@expo/vector-icons";
 import ViewShot from "react-native-view-shot";
@@ -17,6 +17,7 @@ export function ShareCardSheet({ visible, onClose, log }: { visible: boolean; on
   const [variant, setVariant] = useState<ShareCardVariant>(hasQuote ? "quote" : "review");
   const [busy, setBusy] = useState<"save" | "share" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [coverUri, setCoverUri] = useState<string | null>(null);
 
   // ShareCardSheet stays mounted persistently (only `visible`/`log` change), so the
   // useState initializer above only runs once. Reset the default variant + any stale
@@ -27,8 +28,36 @@ export function ShareCardSheet({ visible, onClose, log }: { visible: boolean; on
     setVariant(log.quote ? "quote" : "review");
     setMessage(null);
     setBusy(null);
+    setCoverUri(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [log?.id]);
+
+  async function pickCover(useCamera: boolean) {
+    const ImagePicker = await import("expo-image-picker");
+    const permission = useCamera
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setMessage(
+        pick(language, "امنح الإذن من إعدادات هاتفك للمتابعة.", "Grant permission from your phone's settings to continue.")
+      );
+      return;
+    }
+    const result = useCamera
+      ? await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 0.9 })
+      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.9 });
+    if (result.canceled || !result.assets?.[0]) return;
+    setMessage(null);
+    setCoverUri(result.assets[0].uri);
+  }
+
+  function handleChangeCover() {
+    Alert.alert(pick(language, "غلاف البطاقة", "Card cover"), undefined, [
+      { text: pick(language, "التقاط صورة", "Take photo"), onPress: () => pickCover(true) },
+      { text: pick(language, "اختيار من الصور", "Choose from library"), onPress: () => pickCover(false) },
+      { text: pick(language, "إلغاء", "Cancel"), style: "cancel" },
+    ]);
+  }
 
   if (!log) return null;
 
@@ -123,8 +152,13 @@ export function ShareCardSheet({ visible, onClose, log }: { visible: boolean; on
           </View>
         )}
 
+        <Pressable style={styles.coverButton} onPress={handleChangeCover}>
+          <Ionicons name="image-outline" size={14} color={colors.paper} />
+          <Text style={styles.coverButtonText}>{pick(language, "تغيير الغلاف", "Change cover")}</Text>
+        </Pressable>
+
         <ScrollView style={styles.cardScroll} contentContainerStyle={styles.cardScrollContent}>
-          <ShareCard ref={viewShotRef} log={log} variant={variant} />
+          <ShareCard ref={viewShotRef} log={log} variant={variant} coverUri={coverUri} />
         </ScrollView>
 
         {message && <Text style={styles.message}>{message}</Text>}
@@ -163,6 +197,18 @@ const styles = StyleSheet.create({
   toggleButtonActive: { borderColor: colors.green, backgroundColor: "rgba(33,153,139,0.12)" },
   toggleText: { color: colors.muted, fontSize: 11, fontWeight: "600" },
   toggleTextActive: { color: colors.paper },
+  coverButton: {
+    flexDirection: "row",
+    alignSelf: "center",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  coverButtonText: { color: colors.paper, fontSize: 11, fontWeight: "600" },
   cardScroll: { flexGrow: 0 },
   cardScrollContent: { alignItems: "center", paddingVertical: 8 },
   message: { color: colors.muted, fontSize: 11, textAlign: "center" },

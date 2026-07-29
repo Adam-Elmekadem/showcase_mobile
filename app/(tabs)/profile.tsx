@@ -101,19 +101,44 @@ export default function ProfileScreen() {
     if (result.canceled || !result.assets?.[0]) return;
 
     const asset = result.assets[0];
-    const filename = asset.uri.split("/").pop() ?? "avatar.jpg";
-    const extension = (filename.includes(".") ? filename.split(".").pop() : "jpg") ?? "jpg";
-    const mimeType = extension.toLowerCase() === "jpg" ? "jpeg" : extension.toLowerCase();
 
     setAvatarBusy(true);
+
+    // Picked photos can come back as a large content:// URI straight from the
+    // camera roll — React Native's networking layer can fail to read those
+    // directly when building a multipart body ("Network request failed" with
+    // no server-side clue why). Re-encoding through expo-image-manipulator
+    // both shrinks the file (faster, safer upload) and normalizes it to a
+    // plain file:// JPEG that fetch can reliably attach. But the manipulator
+    // is its own native module and can fail independently (e.g. on a
+    // content:// URI it can't read either) — if it does, fall back to
+    // uploading the original picked file rather than aborting outright.
+    let uploadUri = asset.uri;
+    let uploadType = asset.mimeType && asset.mimeType.startsWith("image/") ? asset.mimeType : "image/jpeg";
     try {
-      const { data } = await api.updateAvatar({ uri: asset.uri, name: filename, type: `image/${mimeType}` });
+      const { manipulateAsync, SaveFormat } = await import("expo-image-manipulator");
+      const manipulated = await manipulateAsync(asset.uri, [{ resize: { width: 640, height: 640 } }], {
+        compress: 0.8,
+        format: SaveFormat.JPEG,
+      });
+      uploadUri = manipulated.uri;
+      uploadType = "image/jpeg";
+    } catch (manipulateError) {
+      console.log("Avatar: image resize/re-encode failed, uploading original file instead.", manipulateError);
+    }
+
+    try {
+      const { data } = await api.updateAvatar({ uri: uploadUri, name: "avatar.jpg", type: uploadType });
       setUser(data);
     } catch (error) {
-      Alert.alert(
-        pick(language, "تعذّر الرفع", "Upload failed"),
-        error instanceof ApiError ? error.message : pick(language, "حاول مجددًا.", "Please try again.")
-      );
+      console.log("Avatar upload failed:", error);
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : error instanceof Error && error.message
+          ? error.message
+          : pick(language, "حاول مجددًا.", "Please try again.");
+      Alert.alert(pick(language, "تعذّر الرفع", "Upload failed"), message);
     } finally {
       setAvatarBusy(false);
     }
@@ -146,23 +171,27 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.profileRow}>
-          <Pressable onPress={handleAvatarPress} disabled={avatarBusy}>
+          <Pressable onPress={handleAvatarPress} disabled={avatarBusy} style={styles.avatarWrap}>
             <View style={styles.avatar}>
               {user.avatar_url ? (
                 <Image source={{ uri: user.avatar_url }} style={styles.avatarImage} contentFit="cover" />
               ) : (
                 <Text style={styles.avatarText}>{user.name.slice(0, 1).toUpperCase()}</Text>
               )}
-              {avatarBusy ? (
+              {avatarBusy && (
                 <View style={styles.avatarOverlay}>
                   <ActivityIndicator color={colors.paper} size="small" />
                 </View>
-              ) : (
-                <View style={styles.avatarBadge}>
-                  <Ionicons name="camera" size={12} color={colors.paper} />
-                </View>
               )}
             </View>
+            {/* Sits in a wrapper without overflow:hidden — a circular avatar clips
+                its own corners, so a badge drawn *inside* the circle view was
+                being cut off by the same rounding that makes the avatar round. */}
+            {!avatarBusy && (
+              <View style={styles.avatarBadge}>
+                <Ionicons name="camera" size={13} color={colors.paper} />
+              </View>
+            )}
           </Pressable>
           <View style={styles.profileInfo}>
             <Text style={styles.name}>{user.name}</Text>
@@ -284,17 +313,18 @@ const styles = StyleSheet.create({
   langToggle: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: 10, paddingVertical: 6 },
   langToggleText: { color: colors.muted, fontSize: 11, fontWeight: "600" },
   profileRow: { flexDirection: "row", alignItems: "center", gap: 16 },
+  avatarWrap: { width: 72, height: 72 },
   avatar: { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.borderStrong, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   avatarImage: { width: "100%", height: "100%" },
   avatarText: { color: colors.paperMuted, fontSize: 28, fontWeight: "600" },
   avatarOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(9,9,16,0.55)", alignItems: "center", justifyContent: "center" },
   avatarBadge: {
     position: "absolute",
-    bottom: 0,
-    right: 0,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    bottom: -2,
+    right: -2,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: colors.green,
     borderWidth: 2,
     borderColor: colors.ink,

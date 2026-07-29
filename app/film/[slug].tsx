@@ -162,10 +162,16 @@ export default function FilmDetailScreen() {
           )}
 
           {user ? (
-            <Pressable style={styles.logButton} onPress={() => router.push(`/log/${film.tmdb_id}`)}>
-              <Ionicons name="film-outline" size={16} color={colors.paper} />
-              <Text style={styles.logButtonText}>{pick(language, "سجّل ومراجعة", "Log & review")}</Text>
-            </Pressable>
+            <View style={styles.logRow}>
+              <Pressable style={[styles.logButton, styles.logButtonFlex]} onPress={() => router.push(`/log/${film.tmdb_id}`)}>
+                <Ionicons name="film-outline" size={16} color={colors.paper} />
+                <Text style={styles.logButtonText}>{pick(language, "سجّل ومراجعة", "Log & review")}</Text>
+              </Pressable>
+              <Pressable style={[styles.quoteButton, styles.logButtonFlex]} onPress={() => router.push(`/quote/${film.tmdb_id}`)}>
+                <Ionicons name="chatbox-ellipses-outline" size={16} color={colors.gold} />
+                <Text style={styles.quoteButtonText}>{pick(language, "اقتباس", "Quote")}</Text>
+              </Pressable>
+            </View>
           ) : (
             <Pressable style={styles.logButtonOutline} onPress={() => router.push("/login")}>
               <Text style={styles.logButtonOutlineText}>{pick(language, "سجّل الدخول للتسجيل والمراجعة", "Sign in to log & review")}</Text>
@@ -304,6 +310,8 @@ const styles = StyleSheet.create({
   actionsRow: { flexDirection: "row", justifyContent: "space-around", borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.line, paddingVertical: 14 },
   actionButton: { alignItems: "center", gap: 6 },
   actionButtonText: { color: colors.paper, fontSize: 10 },
+  logRow: { flexDirection: "row", gap: 10 },
+  logButtonFlex: { flex: 1 },
   logButton: {
     flexDirection: "row",
     gap: 8,
@@ -314,6 +322,17 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
   },
   logButtonText: { color: colors.paper, fontWeight: "700", fontSize: 13 },
+  quoteButton: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.gold,
+    borderRadius: radius.sm,
+    paddingVertical: 13,
+  },
+  quoteButtonText: { color: colors.gold, fontWeight: "700", fontSize: 13 },
   logButtonOutline: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingVertical: 13, alignItems: "center" },
   logButtonOutlineText: { color: colors.muted, fontSize: 12, fontWeight: "600" },
   section: { gap: 10 },

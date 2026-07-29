@@ -21,6 +21,7 @@ export default function LogFilmScreen() {
 
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [review, setReview] = useState("");
+  const [quote, setQuote] = useState("");
   const [isRewatch, setIsRewatch] = useState(false);
   const [containsSpoilers, setContainsSpoilers] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -36,6 +37,7 @@ export default function LogFilmScreen() {
         is_rewatch: isRewatch,
         contains_spoilers: containsSpoilers,
         review: review.trim() || undefined,
+        quote: quote.trim() || undefined,
         rating_story: ratings.story ?? null,
         rating_direction: ratings.direction ?? null,
         rating_acting: ratings.acting ?? null,
@@ -83,6 +85,31 @@ export default function LogFilmScreen() {
           multiline
           numberOfLines={5}
         />
+      </View>
+
+      <View style={styles.field}>
+        <Text style={styles.fieldLabel}>{pick(language, "اقتباس أو مشهد لا يُنسى (اختياري)", "A memorable quote or scene (optional)")}</Text>
+        <TextInput
+          value={quote}
+          onChangeText={setQuote}
+          placeholder={pick(
+            language,
+            'مثال: "لن أعتذر أبدًا عن هذا القرار." — المشهد الأخير',
+            'e.g. "I\'ll never apologize for this decision." — the final scene'
+          )}
+          placeholderTextColor={colors.muted}
+          style={styles.quoteArea}
+          multiline
+          numberOfLines={2}
+          maxLength={500}
+        />
+        <Text style={styles.fieldHint}>
+          {pick(
+            language,
+            "أضف اقتباسًا لإنشاء بطاقة اقتباس قابلة للمشاركة لهذه المشاهدة.",
+            "Add a quote to unlock a shareable quote card for this log."
+          )}
+        </Text>
       </View>
 
       <View style={styles.toggleRow}>
@@ -133,6 +160,7 @@ const styles = StyleSheet.create({
   ratingLabel: { color: colors.paperMuted, fontSize: 12 },
   field: { gap: 8 },
   fieldLabel: { color: colors.paperMuted, fontSize: 11, fontWeight: "600" },
+  fieldHint: { color: colors.muted, fontSize: 10, marginTop: -2 },
   textArea: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -142,6 +170,18 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 13,
     minHeight: 110,
+    textAlignVertical: "top",
+  },
+  quoteArea: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surface,
+    color: colors.paper,
+    padding: 12,
+    fontSize: 13,
+    fontStyle: "italic",
+    minHeight: 64,
     textAlignVertical: "top",
   },
   toggleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },

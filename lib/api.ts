@@ -103,6 +103,7 @@ export type ApiLog = {
   };
   review: string | null;
   quote: string | null;
+  quote_category: string | null;
   contains_spoilers: boolean;
   likes_count: number;
   liked_by_viewer?: boolean;
@@ -217,24 +218,27 @@ export async function setToken(token: string | null) {
 
 const REQUEST_TIMEOUT_MS = 10000;
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+type RequestOptions = RequestInit & { timeoutMs?: number };
+
+async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const { timeoutMs, ...fetchOptions } = options;
   const token = await getToken();
   // FormData (used for the avatar upload) needs its own auto-generated
   // multipart boundary in the Content-Type header — don't force JSON on it.
-  const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
+  const isFormData = typeof FormData !== "undefined" && fetchOptions.body instanceof FormData;
   const headers: Record<string, string> = {
     Accept: "application/json",
-    ...(options.body && !isFormData ? { "Content-Type": "application/json" } : {}),
+    ...(fetchOptions.body && !isFormData ? { "Content-Type": "application/json" } : {}),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...(options.headers as Record<string, string> | undefined),
+    ...(fetchOptions.headers as Record<string, string> | undefined),
   };
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs ?? REQUEST_TIMEOUT_MS);
 
   let response: Response;
   try {
-    response = await fetch(`${API_URL}${path}`, { ...options, headers, signal: controller.signal });
+    response = await fetch(`${API_URL}${path}`, { ...fetchOptions, headers, signal: controller.signal });
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
       throw new ApiError(
@@ -280,7 +284,10 @@ export const api = {
     // React Native's FormData accepts this {uri,name,type} shape for file parts;
     // the DOM File/Blob types don't quite describe it, hence the cast.
     form.append("avatar", { uri: image.uri, name: image.name, type: image.type } as unknown as Blob);
-    return request<{ data: ApiUser }>("/me/avatar", { method: "POST", body: form });
+    // Multipart uploads take longer than a typical JSON call, especially over
+    // a slower wifi/hotspot connection — give this one more room than the
+    // default 10s before treating it as unreachable.
+    return request<{ data: ApiUser }>("/me/avatar", { method: "POST", body: form, timeoutMs: 30000 });
   },
 
   addFavorite: (tmdbId: number) => request<{ data: ApiUser }>("/me/favorites", { method: "POST", body: JSON.stringify({ tmdb_id: tmdbId }) }),
@@ -308,12 +315,25 @@ export const api = {
 
   syncFilm: (tmdbId: number) => request<{ data: ApiFilm }>("/films/sync", { method: "POST", body: JSON.stringify({ tmdb_id: tmdbId }) }),
 
-  getLogs: (params: { username?: string; film_slug?: string; per_page?: number; following?: boolean } = {}) => {
+  getLogs: (
+    params: {
+      username?: string;
+      film_slug?: string;
+      per_page?: number;
+      following?: boolean;
+      type?: "quote" | "review";
+      category?: string;
+      search?: string;
+    } = {}
+  ) => {
     const search = new URLSearchParams();
     if (params.username) search.set("username", params.username);
     if (params.film_slug) search.set("film_slug", params.film_slug);
     if (params.per_page) search.set("per_page", String(params.per_page));
     if (params.following) search.set("following", "1");
+    if (params.type) search.set("type", params.type);
+    if (params.category) search.set("category", params.category);
+    if (params.search) search.set("search", params.search);
     const qs = search.toString();
     return request<Paginated<ApiLog>>(`/logs${qs ? `?${qs}` : ""}`);
   },
@@ -329,6 +349,7 @@ export const api = {
     rating_music?: number | null;
     review?: string;
     quote?: string;
+    quote_category?: string;
     contains_spoilers?: boolean;
   }) => request<{ data: ApiLog }>("/logs", { method: "POST", body: JSON.stringify(data) }),
 

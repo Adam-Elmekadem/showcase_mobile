@@ -14,11 +14,13 @@ function snippet(text: string, limit: number) {
 
 export type ShareCardVariant = "quote" | "review";
 
-export const ShareCard = forwardRef<React.ComponentRef<typeof ViewShot>, { log: ApiLog; variant: ShareCardVariant }>(
-  function ShareCard({ log, variant }, ref) {
+export const ShareCard = forwardRef<
+  React.ComponentRef<typeof ViewShot>,
+  { log: ApiLog; variant: ShareCardVariant; coverUri?: string | null }
+>(function ShareCard({ log, variant, coverUri }, ref) {
     const film = log.film;
     if (!film) return null;
-    const backdrop = film.backdrop_url ?? film.poster_url ?? null;
+    const backdrop = coverUri ?? film.backdrop_url ?? film.poster_url ?? null;
 
     if (variant === "quote" && log.quote) {
       return (
@@ -101,14 +103,14 @@ const styles = StyleSheet.create({
   username: { color: colors.muted, fontSize: 10, marginTop: 4 },
   brand: { position: "absolute", flexDirection: "row", alignItems: "center", gap: 6, zIndex: 5 },
   brandOnReview: { top: 14, left: 16 },
-  brandOnQuote: { bottom: 16, left: 18 },
+  brandOnQuote: { bottom: 16, left: 0, right: 0, justifyContent: "center" },
   brandMark: { flexDirection: "row", gap: 2, alignItems: "flex-end" },
   brandBar: { width: 5, borderRadius: 2 },
   brandText: { color: colors.paper, fontSize: 12, fontWeight: "700" },
   quoteCard: { minHeight: 400, borderWidth: 1, borderColor: colors.border },
   quoteImageWrap: { width: "100%", height: 210, backgroundColor: colors.surface2 },
   quoteImageShade: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(9,9,16,0.35)" },
-  quoteBody: { padding: 22, paddingBottom: 56, gap: 12 },
-  quoteText: { color: colors.paper, fontSize: 18, lineHeight: 27, fontStyle: "italic" },
-  quoteAttribution: { color: colors.gold, fontSize: 11, fontWeight: "600" },
+  quoteBody: { flex: 1, padding: 22, paddingBottom: 56, gap: 12, alignItems: "center", justifyContent: "center" },
+  quoteText: { color: colors.paper, fontSize: 18, lineHeight: 27, fontStyle: "italic", textAlign: "center" },
+  quoteAttribution: { color: colors.gold, fontSize: 11, fontWeight: "600", textAlign: "center" },
 });
