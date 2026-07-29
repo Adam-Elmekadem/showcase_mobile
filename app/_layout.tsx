@@ -50,6 +50,7 @@ function RootNavigation() {
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="film/[slug]" options={{ title: "" }} />
       <Stack.Screen name="log/[tmdbId]" options={{ presentation: "modal", title: "Log film" }} />
+      <Stack.Screen name="quote/[tmdbId]" options={{ presentation: "modal", title: "Quote" }} />
       <Stack.Screen name="person/[slug]" options={{ title: "" }} />
       <Stack.Screen name="user/[username]" options={{ title: "" }} />
       <Stack.Screen name="user/[username]/connections" options={{ title: "" }} />
