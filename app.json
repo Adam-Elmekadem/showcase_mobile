@@ -1,0 +1,64 @@
+{
+  "expo": {
+    "name": "Showcase",
+    "slug": "showcase-mobile",
+    "scheme": "showcase",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#101017",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#101017"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.showcase.mobile"
+    },
+    "android": {
+      "package": "com.showcase.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#101017",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#101017",
+          "image": "./assets/icon.png",
+          "imageWidth": 160
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Showcase saves the share cards you create to your photo library.",
+          "savePhotosPermission": "Showcase saves the share cards you create to your photo library.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Showcase needs access to your photos so you can set a profile picture.",
+          "cameraPermission": "Showcase needs access to your camera so you can take a profile picture."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
