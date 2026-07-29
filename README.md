@@ -200,16 +200,18 @@ same as any time `package.json` changes.
   picked up, so it's obvious you're in reorder mode, and the long-press
   threshold is a slightly more deliberate 350ms so it doesn't trigger during
   a normal tap-to-open.
-- **Avatar upload failing with "Network request failed."** Photos picked
-  from the camera roll can come back as a `content://` URI on Android, which
-  React Native's networking layer can fail to attach to a multipart request
-  — the request never reaches the server at all, so there's no useful error
-  from the API side. The picked photo is now re-encoded through
-  `expo-image-manipulator` (resized to 640×640, recompressed to JPEG) before
-  upload, which both normalizes it to a plain local file the uploader can
-  read reliably and shrinks it for a faster, safer transfer. The avatar
-  upload's timeout was also bumped from 10s to 30s, since a multipart upload
-  legitimately takes longer than a typical JSON call.
+- **Avatar upload failing with "Network request failed."** Re-encoding the
+  picked photo through `expo-image-manipulator` (still done, see below) made
+  it more reliable but didn't fully fix it — POSTing the binary through our
+  own `php artisan serve` dev server over a phone's Wi-Fi turned out to still
+  be the weak link. Avatar upload now follows the exact same path as the web
+  app's share-card cover photo: sign a direct-to-Cloudinary upload via
+  `POST /uploads/cloudinary-sign` (now takes an optional `folder`, whitelisted
+  to `avatars`/`showcase-covers`), upload the file straight to Cloudinary's
+  API, then `PATCH /me` with the returned `secure_url` — the binary never
+  touches our own server at all. The photo is still resized to 640×640 and
+  recompressed to JPEG via `expo-image-manipulator` first, for a faster
+  upload regardless.
 - **No way to add a quote.** The log form only had a "Review" field — there
   was no input for `quote` at all, so a quote card could never be unlocked
   from the mobile app. Added a dedicated "memorable quote" field (matching
