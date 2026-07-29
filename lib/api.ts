@@ -246,8 +246,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
         0
       );
     }
+    const reason = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
     throw new ApiError(
-      `Network request failed. Check that the API is running and that EXPO_PUBLIC_API_URL (${API_URL}) is reachable from this device.`,
+      `Network request failed (${reason}). Check that the API is running and that EXPO_PUBLIC_API_URL (${API_URL}) is reachable from this device.`,
       0
     );
   } finally {
@@ -276,19 +277,16 @@ export const api = {
 
   me: () => request<{ data: ApiUser }>("/auth/me"),
 
-  updateMe: (data: { name?: string; username?: string; bio?: string; location?: string; watchlist_is_public?: boolean }) =>
+  updateMe: (data: { name?: string; username?: string; bio?: string; location?: string; watchlist_is_public?: boolean; avatar_path?: string | null }) =>
     request<{ data: ApiUser }>("/me", { method: "PATCH", body: JSON.stringify(data) }),
 
-  updateAvatar: (image: { uri: string; name: string; type: string }) => {
-    const form = new FormData();
-    // React Native's FormData accepts this {uri,name,type} shape for file parts;
-    // the DOM File/Blob types don't quite describe it, hence the cast.
-    form.append("avatar", { uri: image.uri, name: image.name, type: image.type } as unknown as Blob);
-    // Multipart uploads take longer than a typical JSON call, especially over
-    // a slower wifi/hotspot connection — give this one more room than the
-    // default 10s before treating it as unreachable.
-    return request<{ data: ApiUser }>("/me/avatar", { method: "POST", body: form, timeoutMs: 30000 });
-  },
+  // The client uploads straight to Cloudinary and only sends us back the
+  // resulting secure_url via updateMe's avatar_path — see signCloudinaryUpload.
+  signCloudinaryUpload: (folder: "avatars" | "showcase-covers") =>
+    request<{ signature: string; timestamp: number; folder: string; api_key: string; cloud_name: string }>("/uploads/cloudinary-sign", {
+      method: "POST",
+      body: JSON.stringify({ folder }),
+    }),
 
   addFavorite: (tmdbId: number) => request<{ data: ApiUser }>("/me/favorites", { method: "POST", body: JSON.stringify({ tmdb_id: tmdbId }) }),
   removeFavorite: (filmId: number) => request<{ data: ApiUser }>(`/me/favorites/${filmId}`, { method: "DELETE" }),

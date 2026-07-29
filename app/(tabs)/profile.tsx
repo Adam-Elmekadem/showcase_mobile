@@ -128,7 +128,25 @@ export default function ProfileScreen() {
     }
 
     try {
-      const { data } = await api.updateAvatar({ uri: uploadUri, name: "avatar.jpg", type: uploadType });
+      // Upload straight to Cloudinary (same pattern as the web app's share-card
+      // cover photo) instead of routing the binary through our own API — that
+      // avoids the local dev server entirely, which is what actually matters
+      // when testing over a phone's Wi-Fi/hotspot connection to a laptop.
+      const sign = await api.signCloudinaryUpload("avatars");
+      const form = new FormData();
+      form.append("file", { uri: uploadUri, name: "avatar.jpg", type: uploadType } as unknown as Blob);
+      form.append("api_key", sign.api_key);
+      form.append("timestamp", String(sign.timestamp));
+      form.append("folder", sign.folder);
+      form.append("signature", sign.signature);
+      const cloudinaryResponse = await fetch(`https://api.cloudinary.com/v1_1/${sign.cloud_name}/image/upload`, {
+        method: "POST",
+        body: form,
+      });
+      if (!cloudinaryResponse.ok) throw new Error("Cloudinary upload failed");
+      const uploaded = await cloudinaryResponse.json();
+
+      const { data } = await api.updateMe({ avatar_path: uploaded.secure_url });
       setUser(data);
     } catch (error) {
       console.log("Avatar upload failed:", error);
