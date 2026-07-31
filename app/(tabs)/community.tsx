@@ -7,10 +7,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { api, ApiLog } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useLocale, pick } from "@/lib/i18n";
-import { colors, radius } from "@/lib/theme";
+import { colors, radius, font } from "@/lib/theme";
 import { QUOTE_CATEGORIES, quoteCategoryLabel } from "@/lib/quoteCategories";
 import { CommentsSection } from "@/components/CommentsSection";
-import { NotificationBell } from "@/components/NotificationBell";
+import { HeaderActions } from "@/components/HeaderActions";
+import { AppLogo } from "@/components/AppLogo";
 import { ShareCardSheet } from "@/components/ShareCardSheet";
 
 type Scope = "all" | "following";
@@ -106,12 +107,10 @@ export default function CommunityScreen() {
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.header}>
+        <AppLogo />
         <View style={styles.titleRow}>
-          <View>
-            <Text style={styles.kicker}>SHOWCASE</Text>
-            <Text style={styles.heading}>{pick(language, "المجتمع", "Community")}</Text>
-          </View>
-          <NotificationBell />
+          <Text style={styles.heading}>{pick(language, "المجتمع", "Community")}</Text>
+          <HeaderActions />
         </View>
 
         <View style={styles.typeTabs}>
@@ -280,9 +279,8 @@ export default function CommunityScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.ink },
   header: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 14, gap: 12 },
-  kicker: { color: colors.green, fontSize: 10, letterSpacing: 1.5, fontWeight: "700" },
-  heading: { color: colors.paper, fontSize: 26, fontWeight: "600", letterSpacing: -0.5 },
-  titleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  heading: { color: colors.paper, fontFamily: font.display, fontSize: 30, letterSpacing: 0.5 },
+  titleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   typeTabs: { flexDirection: "row", gap: 8 },
   typeTab: {
     flex: 1,

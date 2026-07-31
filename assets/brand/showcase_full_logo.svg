@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_2" data-name="Layer 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 336.88 100">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #ededf3;
+        font-family: NeoSansArabic-Medium, 'Neo Sans Arabic';
+        font-size: 48.94px;
+        font-weight: 500;
+      }
+
+      .cls-2 {
+        fill: #21998b;
+      }
+
+      .cls-3 {
+        fill: #e04667;
+      }
+    </style>
+  </defs>
+  <g id="Layer_1-2" data-name="Layer 1">
+    <g>
+      <g>
+        <rect class="cls-2" y="50.41" width="67.6" height="28.79"/>
+        <rect class="cls-3" x="33.02" y="10.81" width="69.17" height="28.79" transform="translate(-4.54 24.25) rotate(-19.69)"/>
+      </g>
+      <text class="cls-1" transform="translate(83.92 79.2)"><tspan x="0" y="0">SHOWCASE</tspan></text>
+    </g>
+  </g>
+</svg>

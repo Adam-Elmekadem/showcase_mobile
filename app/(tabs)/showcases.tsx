@@ -6,8 +6,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { api, ApiList } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useLocale, pick } from "@/lib/i18n";
-import { colors, radius } from "@/lib/theme";
+import { colors, radius, font } from "@/lib/theme";
 import { ShowcaseCard } from "@/components/ShowcaseCard";
+import { HeaderActions } from "@/components/HeaderActions";
+import { AppLogo } from "@/components/AppLogo";
 
 type Scope = "all" | "mine";
 
@@ -44,16 +46,17 @@ export default function ShowcasesScreen() {
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.header}>
+        <AppLogo />
         <View style={styles.headerRow}>
-          <View>
-            <Text style={styles.kicker}>SHOWCASE</Text>
-            <Text style={styles.heading}>{pick(language, "العروض", "Showcases")}</Text>
+          <Text style={styles.heading}>{pick(language, "العروض", "Showcases")}</Text>
+          <View style={styles.headerActionsRow}>
+            {user && (
+              <Pressable style={styles.createButton} onPress={() => router.push("/showcase/new")}>
+                <Ionicons name="add" size={18} color={colors.paper} />
+              </Pressable>
+            )}
+            <HeaderActions />
           </View>
-          {user && (
-            <Pressable style={styles.createButton} onPress={() => router.push("/showcase/new")}>
-              <Ionicons name="add" size={18} color={colors.paper} />
-            </Pressable>
-          )}
         </View>
 
         {user && (
@@ -94,9 +97,9 @@ export default function ShowcasesScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.ink },
   header: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 14, gap: 14 },
-  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" },
-  kicker: { color: colors.green, fontSize: 10, letterSpacing: 1.5, fontWeight: "700" },
-  heading: { color: colors.paper, fontSize: 26, fontWeight: "600", letterSpacing: -0.5, marginTop: 4 },
+  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  heading: { color: colors.paper, fontFamily: font.display, fontSize: 30, letterSpacing: 0.5 },
+  headerActionsRow: { flexDirection: "row", alignItems: "center", gap: 14 },
   createButton: { width: 38, height: 38, borderRadius: radius.sm, backgroundColor: colors.green, alignItems: "center", justifyContent: "center" },
   tabs: { flexDirection: "row", gap: 8 },
   tab: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: 14, paddingVertical: 7 },

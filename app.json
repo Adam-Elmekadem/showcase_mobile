@@ -19,7 +19,7 @@
     "android": {
       "package": "com.showcase.mobile",
       "adaptiveIcon": {
-        "backgroundColor": "#101017",
+        "backgroundColor": "#161723",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
@@ -55,7 +55,8 @@
           "photosPermission": "Showcase needs access to your photos so you can set a profile picture.",
           "cameraPermission": "Showcase needs access to your camera so you can take a profile picture."
         }
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true

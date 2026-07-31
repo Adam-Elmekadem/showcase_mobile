@@ -3,8 +3,9 @@ import { View, Text, Pressable, StyleSheet, ActivityIndicator } from "react-nati
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { colors, radius } from "@/lib/theme";
+import { colors, radius, font } from "@/lib/theme";
 import { api } from "@/lib/api";
+import { setSwipeQueue } from "@/lib/swipeQueue";
 
 export type FilmCardData = {
   tmdb_id: number;
@@ -12,8 +13,12 @@ export type FilmCardData = {
   title: string;
   year?: number | string | null;
   poster_url?: string | null;
+  backdrop_url?: string | null;
   vote_average?: number | null;
+  genres?: string[] | null;
   viewer_watched?: boolean;
+  viewer_rating?: number | null;
+  viewer_log_id?: number | null;
 };
 
 const CARD_GAP = 12;
@@ -23,16 +28,33 @@ export function FilmCard({
   width,
   onToggleWatchlist,
   inWatchlist,
+  onPress,
+  siblings,
 }: {
   film: FilmCardData;
   width: number;
   onToggleWatchlist?: () => void;
   inWatchlist?: boolean;
+  /** Runs instead of the default film-detail navigation, e.g. to close a modal first. */
+  onPress?: () => void;
+  /** The full list this card belongs to (e.g. the row/grid it's rendered in) —
+   * when provided, tapping opens the swipeable browse view over this set
+   * instead of going straight to the film detail page. */
+  siblings?: FilmCardData[];
 }) {
   const router = useRouter();
   const [opening, setOpening] = useState(false);
 
   async function openDetail() {
+    if (onPress) {
+      onPress();
+      return;
+    }
+    if (siblings && siblings.length > 0) {
+      setSwipeQueue(siblings);
+      router.push({ pathname: "/swipe", params: { startTmdbId: String(film.tmdb_id) } });
+      return;
+    }
     if (opening) return;
     if (film.slug) {
       router.push(`/film/${film.slug}`);
@@ -112,7 +134,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.green,
   },
-  ratingBadgeText: { color: colors.paper, fontSize: 11, fontWeight: "700" },
+  ratingBadgeText: { color: colors.paper, fontFamily: font.display, fontSize: 13 },
   saveButton: {
     position: "absolute",
     left: 8,

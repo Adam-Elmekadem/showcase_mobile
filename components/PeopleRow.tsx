@@ -1,5 +1,6 @@
 import React from "react";
-import { View, Text, FlatList, Pressable, StyleSheet } from "react-native";
+import { View, Text, Pressable, StyleSheet } from "react-native";
+import { FlatList } from "react-native-gesture-handler";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { colors } from "@/lib/theme";

@@ -1,6 +1,7 @@
 import React from "react";
-import { View, Text, FlatList, StyleSheet } from "react-native";
-import { colors } from "@/lib/theme";
+import { View, Text, StyleSheet } from "react-native";
+import { FlatList } from "react-native-gesture-handler";
+import { colors, font } from "@/lib/theme";
 import { FilmCard, FilmCardData } from "@/components/FilmCard";
 
 const CARD_WIDTH = 108;
@@ -16,7 +17,7 @@ export function HorizontalFilms({ title, films }: { title: string; films: FilmCa
         keyExtractor={(item, index) => `${item.tmdb_id}-${index}`}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.row}
-        renderItem={({ item }) => <FilmCard film={item} width={CARD_WIDTH} />}
+        renderItem={({ item }) => <FilmCard film={item} width={CARD_WIDTH} siblings={films} />}
       />
     </View>
   );
@@ -24,6 +25,6 @@ export function HorizontalFilms({ title, films }: { title: string; films: FilmCa
 
 const styles = StyleSheet.create({
   section: { gap: 10 },
-  title: { color: colors.paperMuted, fontSize: 11, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
+  title: { color: colors.paperMuted, fontFamily: font.display, fontSize: 15, letterSpacing: 1, textTransform: "uppercase" },
   row: { gap: 14 },
 });

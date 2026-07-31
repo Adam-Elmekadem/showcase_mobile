@@ -1,10 +1,13 @@
 import React, { useCallback, useState } from "react";
 import { View, Text, FlatList, StyleSheet, ActivityIndicator, useWindowDimensions } from "react-native";
 import { useFocusEffect } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { api, ApiFilm } from "@/lib/api";
 import { useLocale, pick } from "@/lib/i18n";
-import { colors } from "@/lib/theme";
-import { FilmCard, filmCardWidth, filmCardGap } from "@/components/FilmCard";
+import { colors, font } from "@/lib/theme";
+import { FilmCard, FilmCardData, filmCardWidth, filmCardGap } from "@/components/FilmCard";
+import { HeaderActions } from "@/components/HeaderActions";
+import { AppLogo } from "@/components/AppLogo";
 
 const COLUMNS = 3;
 
@@ -34,6 +37,20 @@ export default function WatchlistScreen() {
     }, [load])
   );
 
+  const filmCards: FilmCardData[] = films.map((item) => ({
+    tmdb_id: item.tmdb_id,
+    slug: item.slug,
+    title: item.title,
+    year: item.year,
+    poster_url: item.poster_url,
+    backdrop_url: item.backdrop_url,
+    vote_average: item.vote_average,
+    genres: item.genres,
+    viewer_watched: item.viewer_watched,
+    viewer_rating: item.viewer_rating,
+    viewer_log_id: item.viewer_log_id,
+  }));
+
   async function removeFromWatchlist(film: ApiFilm) {
     setFilms((current) => current.filter((f) => f.id !== film.id));
     try {
@@ -44,7 +61,15 @@ export default function WatchlistScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <View style={styles.header}>
+        <AppLogo />
+        <View style={styles.titleRow}>
+          <Text style={styles.heading}>{pick(language, "قائمة المشاهدة", "Watchlist")}</Text>
+          <HeaderActions />
+        </View>
+      </View>
+
       {loading ? (
         <ActivityIndicator style={styles.loader} color={colors.green} />
       ) : films.length === 0 ? (
@@ -59,29 +84,26 @@ export default function WatchlistScreen() {
           contentContainerStyle={styles.grid}
           columnWrapperStyle={{ gap: filmCardGap }}
           ItemSeparatorComponent={() => <View style={{ height: 18 }} />}
-          renderItem={({ item }) => (
+          renderItem={({ item, index }) => (
             <FilmCard
-              film={{
-                tmdb_id: item.tmdb_id,
-                slug: item.slug,
-                title: item.title,
-                year: item.year,
-                poster_url: item.poster_url,
-                vote_average: item.vote_average,
-              }}
+              film={filmCards[index]}
               width={cardWidth}
               inWatchlist
               onToggleWatchlist={() => removeFromWatchlist(item)}
+              siblings={filmCards}
             />
           )}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.ink, paddingTop: 16 },
+  container: { flex: 1, backgroundColor: colors.ink },
+  header: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 },
+  titleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  heading: { color: colors.paper, fontFamily: font.display, fontSize: 30, letterSpacing: 0.5 },
   loader: { marginTop: 40 },
   empty: { flex: 1, alignItems: "center", justifyContent: "center" },
   emptyText: { color: colors.muted, fontSize: 12 },

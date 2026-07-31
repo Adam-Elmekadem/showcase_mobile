@@ -1,5 +1,5 @@
 import React, { useCallback } from "react";
-import { Pressable, View, StyleSheet } from "react-native";
+import { Pressable, View, Text, StyleSheet } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
@@ -10,14 +10,14 @@ import { colors } from "@/lib/theme";
 export function NotificationBell() {
   const { user } = useAuth();
   const router = useRouter();
-  const [hasUnread, setHasUnread] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
       if (!user) return;
       api
         .getNotifications()
-        .then(({ data }) => setHasUnread(data.some((item) => !item.read_at)))
+        .then(({ data }) => setUnreadCount(data.filter((item) => !item.read_at).length))
         .catch(() => {});
     }, [user])
   );
@@ -27,12 +27,30 @@ export function NotificationBell() {
   return (
     <Pressable style={styles.button} onPress={() => router.push("/notifications")} hitSlop={8}>
       <Ionicons name="notifications-outline" size={20} color={colors.paper} />
-      {hasUnread && <View style={styles.dot} />}
+      {unreadCount > 0 && (
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{unreadCount > 9 ? "9+" : unreadCount}</Text>
+        </View>
+      )}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   button: { position: "relative", padding: 4 },
-  dot: { position: "absolute", top: 2, right: 2, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.orange, borderWidth: 1, borderColor: colors.ink },
+  badge: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 3,
+    backgroundColor: colors.orange,
+    borderWidth: 1,
+    borderColor: colors.ink,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badgeText: { color: colors.paper, fontSize: 9, fontWeight: "700", lineHeight: 11 },
 });

@@ -26,5 +26,16 @@ export const radius = {
 };
 
 export const font = {
-  serif: undefined as string | undefined, // Georgia isn't bundled on Android; falls back to serif family per-platform.
+  // Noto Kufi Arabic — matches the web app's bilingual body font exactly
+  // (see app/globals.css's Google Fonts import). Set as the app-wide <Text>
+  // default in app/_layout.tsx.
+  body: "NotoKufiArabic_600SemiBold",
+  bodyRegular: "NotoKufiArabic_400Regular",
+  bodyMedium: "NotoKufiArabic_500Medium",
+  bodyBold: "NotoKufiArabic_700Bold",
+  // Bebas Neue — Latin-only display face reserved for the wordmark, page
+  // headings, section labels, and stat/rating numbers. Never used for Arabic
+  // text (no Arabic glyphs) or for long-form body copy (all-caps condensed
+  // faces only read well as short punchy labels).
+  display: "BebasNeue_400Regular",
 };

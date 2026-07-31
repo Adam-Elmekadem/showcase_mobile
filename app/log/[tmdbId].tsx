@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { View, Text, TextInput, ScrollView, Pressable, StyleSheet, Switch, KeyboardAvoidingView, Platform } from "react-native";
+import React, { useEffect, useState } from "react";
+import { View, Text, TextInput, ScrollView, Pressable, StyleSheet, Switch, KeyboardAvoidingView, Platform, ActivityIndicator } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { api, ApiError } from "@/lib/api";
 import { useLocale, pick } from "@/lib/i18n";
@@ -15,7 +15,7 @@ const CATEGORIES: { key: "story" | "direction" | "acting" | "cinematography" | "
 ];
 
 export default function LogFilmScreen() {
-  const { tmdbId } = useLocalSearchParams<{ tmdbId: string }>();
+  const { tmdbId, logId } = useLocalSearchParams<{ tmdbId: string; logId?: string }>();
   const { language } = useLocale();
   const router = useRouter();
 
@@ -26,30 +26,65 @@ export default function LogFilmScreen() {
   const [containsSpoilers, setContainsSpoilers] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadingExisting, setLoadingExisting] = useState(!!logId);
+
+  useEffect(() => {
+    if (!logId) return;
+    api
+      .getLog(Number(logId))
+      .then(({ data }) => {
+        setRatings({
+          story: data.ratings.story ?? 0,
+          direction: data.ratings.direction ?? 0,
+          acting: data.ratings.acting ?? 0,
+          cinematography: data.ratings.cinematography ?? 0,
+          music: data.ratings.music ?? 0,
+        });
+        setReview(data.review ?? "");
+        setQuote(data.quote ?? "");
+        setIsRewatch(data.is_rewatch);
+        setContainsSpoilers(data.contains_spoilers);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingExisting(false));
+  }, [logId]);
 
   async function handleSave() {
     if (!tmdbId) return;
     setBusy(true);
     setError(null);
+    const payload = {
+      tmdb_id: Number(tmdbId),
+      is_rewatch: isRewatch,
+      contains_spoilers: containsSpoilers,
+      review: review.trim() || undefined,
+      quote: quote.trim() || undefined,
+      rating_story: ratings.story ?? null,
+      rating_direction: ratings.direction ?? null,
+      rating_acting: ratings.acting ?? null,
+      rating_cinematography: ratings.cinematography ?? null,
+      rating_music: ratings.music ?? null,
+    };
     try {
-      await api.createLog({
-        tmdb_id: Number(tmdbId),
-        is_rewatch: isRewatch,
-        contains_spoilers: containsSpoilers,
-        review: review.trim() || undefined,
-        quote: quote.trim() || undefined,
-        rating_story: ratings.story ?? null,
-        rating_direction: ratings.direction ?? null,
-        rating_acting: ratings.acting ?? null,
-        rating_cinematography: ratings.cinematography ?? null,
-        rating_music: ratings.music ?? null,
-      });
+      if (logId) {
+        await api.updateLog(Number(logId), payload);
+      } else {
+        await api.createLog(payload);
+      }
       router.back();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : pick(language, "تعذّر الحفظ.", "Couldn't save."));
     } finally {
       setBusy(false);
     }
+  }
+
+  if (loadingExisting) {
+    return (
+      <View style={styles.loaderScreen}>
+        <ActivityIndicator color={colors.green} />
+      </View>
+    );
   }
 
   return (
@@ -59,7 +94,9 @@ export default function LogFilmScreen() {
       keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
     >
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      <Text style={styles.heading}>{pick(language, "سجّل مشاهدتك", "Log your watch")}</Text>
+      <Text style={styles.heading}>
+        {logId ? pick(language, "تعديل التسجيل", "Update your log") : pick(language, "سجّل مشاهدتك", "Log your watch")}
+      </Text>
 
       <View style={styles.ratingsCard}>
         {CATEGORIES.map((category) => (
@@ -146,6 +183,7 @@ export default function LogFilmScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.ink },
+  loaderScreen: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.ink },
   content: { padding: 20, paddingBottom: 48, gap: 20 },
   heading: { color: colors.paper, fontSize: 20, fontWeight: "700" },
   ratingsCard: {

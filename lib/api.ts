@@ -56,6 +56,7 @@ export type SearchResult = {
   release_date: string | null;
   year: string | null;
   poster_url: string | null;
+  backdrop_url: string | null;
   overview: string;
   vote_average?: number | null;
   genres?: string[];
@@ -73,6 +74,7 @@ export type DiscoverParams = {
   min_rating?: number;
   sort_by?: "popularity.desc" | "popularity.asc" | "vote_average.desc" | "vote_average.asc" | "primary_release_date.desc" | "primary_release_date.asc" | "title.asc";
   page?: number;
+  upcoming?: boolean;
 };
 
 export type ApiUser = {
@@ -303,6 +305,7 @@ export const api = {
     if (params.min_rating) search.set("min_rating", String(params.min_rating));
     if (params.sort_by) search.set("sort_by", params.sort_by);
     if (params.page) search.set("page", String(params.page));
+    if (params.upcoming) search.set("upcoming", "1");
     const qs = search.toString();
     return request<{ data: SearchResult[]; meta: { page: number; total_pages: number } }>(`/films/discover${qs ? `?${qs}` : ""}`);
   },
@@ -350,6 +353,29 @@ export const api = {
     quote_category?: string;
     contains_spoilers?: boolean;
   }) => request<{ data: ApiLog }>("/logs", { method: "POST", body: JSON.stringify(data) }),
+
+  getLog: (id: number) => request<{ data: ApiLog }>(`/logs/${id}`),
+
+  // The update route validates through the same FormRequest as create, which
+  // requires tmdb_id even though the controller excludes it from the actual
+  // DB update — so callers must still pass it here.
+  updateLog: (
+    id: number,
+    data: {
+      tmdb_id: number;
+      watched_on?: string;
+      is_rewatch?: boolean;
+      rating_story?: number | null;
+      rating_direction?: number | null;
+      rating_acting?: number | null;
+      rating_cinematography?: number | null;
+      rating_music?: number | null;
+      review?: string;
+      quote?: string;
+      quote_category?: string;
+      contains_spoilers?: boolean;
+    }
+  ) => request<{ data: ApiLog }>(`/logs/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
 
   deleteLog: (id: number) => request<void>(`/logs/${id}`, { method: "DELETE" }),
 
