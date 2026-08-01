@@ -86,7 +86,12 @@ export function ShareCardSheet({ visible, onClose, log }: { visible: boolean; on
     }
     setBusy("save");
     try {
-      const MediaLibrary = await import("expo-media-library");
+      // This package's main entry point is the newer class-based API, which
+      // doesn't export saveToLibraryAsync at all (calling it threw
+      // immediately, surfacing as "Couldn't save" regardless of
+      // permissions) -- the familiar function-based API, including
+      // saveToLibraryAsync, only exists under the /legacy subpath now.
+      const MediaLibrary = await import("expo-media-library/legacy");
       // Write-only: this only ever saves a newly generated image, it never
       // reads existing photos. Requesting full/read access instead pulls in
       // Android 14+'s "select which photos to allow" picker — a read-access

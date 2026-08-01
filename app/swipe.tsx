@@ -3,7 +3,8 @@ import { View, Text, Pressable, StyleSheet, useWindowDimensions, ActivityIndicat
 import { Image } from "expo-image";
 import PagerView from "react-native-pager-view";
 import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, withDelay } from "react-native-reanimated";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, withDelay, runOnJS } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter, ImperativeRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -21,7 +22,8 @@ import { FloatingBackButton } from "@/components/FloatingBackButton";
 // compute where "centered at rest" sits and to keep the scroll content
 // gap-free, so an approximate estimate is fine.
 const ABOVE_HEIGHT = 114; // title + genre chips + rating row
-const BELOW_HEIGHT = 90; // year + your rating + icon menu
+const BELOW_HEIGHT = 90; // year + your rating + icon menu (sheet mode only)
+const MORPH_BELOW_HEIGHT = 50; // year + your rating, no icon menu (see showIconMenu)
 const POSTER_ASPECT = 0.69; // matches FilmCard's poster ratio elsewhere in the app
 
 export default function SwipeScreen() {
@@ -97,12 +99,19 @@ function SwipeCard(props: SwipeCardProps) {
 function useSwipeCardState(film: FilmCardData, isActive: boolean, router: ImperativeRouter) {
   const [resolved, setResolved] = useState<ApiFilm | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  // Distinguishes "haven't fetched yet" from "fetched and it failed" — the
+  // free-tier backend occasionally has a transient hiccup, and without this
+  // a failed fetch silently rendered nothing at all, forever (no retry ever
+  // fired again), which is what the persistent empty scroll space actually
+  // was: not a layout bug, a swallowed fetch failure.
+  const [failed, setFailed] = useState(false);
   const [liked, setLiked] = useState(false);
   const fetchedRef = useRef(false);
 
   function fetchDetail() {
     if (fetchedRef.current) return;
     fetchedRef.current = true;
+    setFailed(false);
     setLoadingDetail(true);
     api
       .syncFilm(film.tmdb_id)
@@ -112,6 +121,7 @@ function useSwipeCardState(film: FilmCardData, isActive: boolean, router: Impera
       })
       .catch(() => {
         fetchedRef.current = false;
+        setFailed(true);
       })
       .finally(() => setLoadingDetail(false));
   }
@@ -158,13 +168,13 @@ function useSwipeCardState(film: FilmCardData, isActive: boolean, router: Impera
     }
   }
 
-  return { resolved, loadingDetail, liked, fetchDetail, openDetail, toggleLike };
+  return { resolved, loadingDetail, failed, liked, fetchDetail, openDetail, toggleLike };
 }
 
 function AboveBlock({ film, showRating = true }: { film: FilmCardData; showRating?: boolean }) {
   return (
     <View style={styles.aboveBlock}>
-      <Text style={styles.titleText} numberOfLines={2}>
+      <Text style={styles.titleText} numberOfLines={1} ellipsizeMode="tail">
         {film.title}
       </Text>
       {film.genres && film.genres.length > 0 && (
@@ -193,6 +203,7 @@ function BelowMenu({
   liked,
   router,
   toggleLike,
+  showIconMenu = true,
 }: {
   film: FilmCardData;
   watched: boolean | undefined;
@@ -200,6 +211,13 @@ function BelowMenu({
   liked: boolean;
   router: ImperativeRouter;
   toggleLike: () => void;
+  // Morph mode already surfaces a complete action row (Watched/Like/
+  // Watchlist/Showcase) via FilmDetailBody once you scroll into it, so its
+  // own pinned icon menu here is redundant — and incomplete besides, since
+  // it has no "watched" action of its own. Sheet mode has no scroll-in
+  // equivalent (FilmDetailBody only appears once the sheet is opened), so
+  // it keeps this as its only quick-access menu.
+  showIconMenu?: boolean;
 }) {
   const rating = film.viewer_rating;
   return (
@@ -212,34 +230,49 @@ function BelowMenu({
         </Text>
       ) : null}
 
-      <View style={styles.iconMenu}>
-        <Pressable
-          hitSlop={10}
-          onPress={() =>
-            watched
-              ? router.push({ pathname: "/log/[tmdbId]", params: { tmdbId: String(film.tmdb_id), logId: logId ? String(logId) : undefined } })
-              : router.push(`/log/${film.tmdb_id}`)
-          }
-        >
-          <Ionicons name={watched ? "create-outline" : "add-circle-outline"} size={22} color={colors.paper} />
-        </Pressable>
-        <Pressable hitSlop={10} onPress={() => router.push(`/quote/${film.tmdb_id}`)}>
-          <Ionicons name="chatbox-ellipses-outline" size={22} color={colors.paper} />
-        </Pressable>
-        <Pressable hitSlop={10} onPress={toggleLike}>
-          <Ionicons name={liked ? "heart" : "heart-outline"} size={22} color={liked ? colors.orange : colors.paper} />
-        </Pressable>
-        <Pressable hitSlop={10} onPress={() => api.addWatchlist(film.tmdb_id).catch(() => {})}>
-          <Ionicons name="bookmark-outline" size={22} color={colors.paper} />
-        </Pressable>
-      </View>
+      {showIconMenu && (
+        <View style={styles.iconMenu}>
+          <Pressable
+            hitSlop={10}
+            onPress={() =>
+              watched
+                ? router.push({ pathname: "/log/[tmdbId]", params: { tmdbId: String(film.tmdb_id), logId: logId ? String(logId) : undefined } })
+                : router.push(`/log/${film.tmdb_id}`)
+            }
+          >
+            <Ionicons name={watched ? "create-outline" : "add-circle-outline"} size={22} color={colors.paper} />
+          </Pressable>
+          <Pressable hitSlop={10} onPress={() => router.push(`/quote/${film.tmdb_id}`)}>
+            <Ionicons name="chatbox-ellipses-outline" size={22} color={colors.paper} />
+          </Pressable>
+          <Pressable hitSlop={10} onPress={toggleLike}>
+            <Ionicons name={liked ? "heart" : "heart-outline"} size={22} color={liked ? colors.orange : colors.paper} />
+          </Pressable>
+          <Pressable hitSlop={10} onPress={() => api.addWatchlist(film.tmdb_id).catch(() => {})}>
+            <Ionicons name="bookmark-outline" size={22} color={colors.paper} />
+          </Pressable>
+        </View>
+      )}
+    </View>
+  );
+}
+
+function RetryNotice({ onRetry }: { onRetry: () => void }) {
+  const { language } = useLocale();
+  return (
+    <View style={styles.retryWrap}>
+      <Text style={styles.retryText}>{pick(language, "تعذّر تحميل التفاصيل.", "Couldn't load details.")}</Text>
+      <Pressable style={styles.retryButton} onPress={onRetry}>
+        <Ionicons name="refresh" size={14} color={colors.paper} />
+        <Text style={styles.retryButtonText}>{pick(language, "إعادة المحاولة", "Retry")}</Text>
+      </Pressable>
     </View>
   );
 }
 
 function MorphSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTopStateChange }: SwipeCardProps) {
   const router = useRouter();
-  const { resolved, loadingDetail, liked, fetchDetail, openDetail, toggleLike } = useSwipeCardState(film, isActive, router);
+  const { resolved, loadingDetail, failed, liked, fetchDetail, openDetail, toggleLike } = useSwipeCardState(film, isActive, router);
 
   function handleTopStateChange(atTop: boolean) {
     onTopStateChange(atTop);
@@ -266,7 +299,7 @@ function MorphSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTop
         crossfadeOverlayTitle
         aboveHeight={ABOVE_HEIGHT}
         collapseAboveOnScroll
-        belowHeight={BELOW_HEIGHT}
+        belowHeight={MORPH_BELOW_HEIGHT}
         collapseBelowOnScroll
         initialHeight={imageWidth / POSTER_ASPECT}
         collapsedHeight={pageHeight * 0.28}
@@ -275,12 +308,14 @@ function MorphSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTop
         collapsedRadius={8}
         minContentHeight={resolved ? undefined : pageHeight + 40}
         renderAbove={<AboveBlock film={film} />}
-        renderBelow={<BelowMenu film={film} watched={watched} logId={logId} liked={liked} router={router} toggleLike={toggleLike} />}
+        renderBelow={<BelowMenu film={film} watched={watched} logId={logId} liked={liked} router={router} toggleLike={toggleLike} showIconMenu={false} />}
       >
         {loadingDetail && !resolved ? (
           <ActivityIndicator color={colors.green} style={{ marginTop: 24 }} />
         ) : resolved ? (
           <FilmDetailBody film={resolved} hideMeta />
+        ) : failed ? (
+          <RetryNotice onRetry={fetchDetail} />
         ) : null}
       </ScrollMorphHeader>
     </View>
@@ -289,9 +324,8 @@ function MorphSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTop
 
 function SheetSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTopStateChange }: SwipeCardProps) {
   const router = useRouter();
-  const { resolved, loadingDetail, liked, toggleLike } = useSwipeCardState(film, isActive, router);
+  const { resolved, loadingDetail, failed, fetchDetail, liked, toggleLike } = useSwipeCardState(film, isActive, router);
   const sheetRef = useRef<BottomSheet>(null);
-  const lastTapRef = useRef(0);
   const heartScale = useSharedValue(0);
   const heartOpacity = useSharedValue(0);
 
@@ -317,20 +351,22 @@ function SheetSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTop
     heartOpacity.value = withDelay(350, withTiming(0, { duration: 250 }));
   }
 
-  function handlePosterTap() {
-    const now = Date.now();
-    if (now - lastTapRef.current < 280) {
-      lastTapRef.current = 0;
+  // Resolved by the native gesture recognizer (see the same pattern/reasoning
+  // in ScrollMorphHeader) rather than a JS Date.now()/setTimeout race.
+  const doubleTapGesture = Gesture.Tap()
+    .numberOfTaps(2)
+    .onEnd(() => {
       triggerHeartBurst();
-      toggleLike();
-      return;
-    }
-    lastTapRef.current = now;
-    setTimeout(async () => {
-      if (Date.now() - lastTapRef.current >= 280) return;
-      if (resolved) router.push(`/film/${resolved.slug}`);
-    }, 280);
-  }
+      runOnJS(toggleLike)();
+    });
+
+  const singleTapGesture = Gesture.Tap()
+    .numberOfTaps(1)
+    .onEnd(() => {
+      if (resolved) runOnJS(router.push)(`/film/${resolved.slug}`);
+    });
+
+  const posterTapGesture = Gesture.Exclusive(doubleTapGesture, singleTapGesture);
 
   const heartStyle = useAnimatedStyle(() => ({
     opacity: heartOpacity.value,
@@ -342,24 +378,26 @@ function SheetSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTop
       <View style={styles.sheetCenter}>
         <AboveBlock film={film} showRating={false} />
 
-        <Pressable onPress={handlePosterTap} style={[styles.sheetPoster, { width: imageWidth, height: posterHeight }]}>
-          {film.poster_url ?? film.backdrop_url ? (
-            <Image source={{ uri: film.poster_url ?? film.backdrop_url ?? undefined }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
-          ) : (
-            <View style={[StyleSheet.absoluteFill, styles.fallback]}>
-              <Text style={styles.fallbackText}>{film.title}</Text>
-            </View>
-          )}
-          {hasRating && (
-            <View style={styles.posterRatingBadge}>
-              <Ionicons name="star" size={11} color={colors.gold} />
-              <Text style={styles.posterRatingBadgeText}>{film.vote_average!.toFixed(1)}</Text>
-            </View>
-          )}
-          <Animated.View pointerEvents="none" style={[styles.heartBurst, heartStyle]}>
-            <Ionicons name="heart" size={84} color={colors.paper} />
-          </Animated.View>
-        </Pressable>
+        <GestureDetector gesture={posterTapGesture}>
+          <View style={[styles.sheetPoster, { width: imageWidth, height: posterHeight }]}>
+            {film.poster_url ?? film.backdrop_url ? (
+              <Image source={{ uri: film.poster_url ?? film.backdrop_url ?? undefined }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
+            ) : (
+              <View style={[StyleSheet.absoluteFill, styles.fallback]}>
+                <Text style={styles.fallbackText}>{film.title}</Text>
+              </View>
+            )}
+            {hasRating && (
+              <View style={styles.posterRatingBadge}>
+                <Ionicons name="star" size={11} color={colors.gold} />
+                <Text style={styles.posterRatingBadgeText}>{film.vote_average!.toFixed(1)}</Text>
+              </View>
+            )}
+            <Animated.View pointerEvents="none" style={[styles.heartBurst, heartStyle]}>
+              <Ionicons name="heart" size={84} color={colors.paper} />
+            </Animated.View>
+          </View>
+        </GestureDetector>
 
         <BelowMenu film={film} watched={watched} logId={logId} liked={liked} router={router} toggleLike={toggleLike} />
 
@@ -382,6 +420,8 @@ function SheetSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTop
             <ActivityIndicator color={colors.green} style={{ marginTop: 24 }} />
           ) : resolved ? (
             <FilmDetailBody film={resolved} hideMeta />
+          ) : failed ? (
+            <RetryNotice onRetry={fetchDetail} />
           ) : null}
         </BottomSheetScrollView>
       </BottomSheet>
@@ -391,6 +431,19 @@ function SheetSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTop
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.ink },
+  retryWrap: { alignItems: "center", gap: 10, paddingVertical: 32 },
+  retryText: { color: colors.muted, fontSize: 12 },
+  retryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  retryButtonText: { color: colors.paper, fontSize: 12, fontWeight: "600" },
   pager: { flex: 1 },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.ink, gap: 12 },
   emptyText: { color: colors.muted, fontSize: 13 },
