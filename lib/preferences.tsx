@@ -10,7 +10,7 @@ type PreferencesContextValue = {
 const PreferencesContext = createContext<PreferencesContextValue | null>(null);
 
 export function PreferencesProvider({ children }: { children: React.ReactNode }) {
-  const [swipeDetailStyle, setSwipeDetailStyle] = useState<SwipeDetailStyle>("morph");
+  const [swipeDetailStyle, setSwipeDetailStyle] = useState<SwipeDetailStyle>("sheet");
 
   const value = useMemo(() => ({ swipeDetailStyle, setSwipeDetailStyle }), [swipeDetailStyle]);
 

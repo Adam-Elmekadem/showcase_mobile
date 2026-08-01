@@ -104,6 +104,7 @@ function useSwipeCardState(film: FilmCardData, isActive: boolean, router: Impera
   // was: not a layout bug, a swallowed fetch failure.
   const [failed, setFailed] = useState(false);
   const [liked, setLiked] = useState(false);
+  const [saved, setSaved] = useState(false);
   // Watch count and "has content" are tracked separately from a single
   // viewer_log_id: once any log for this film has a rating/review/quote
   // attached, double-tap must never delete it — it can only add a rewatch.
@@ -178,34 +179,66 @@ function useSwipeCardState(film: FilmCardData, isActive: boolean, router: Impera
     }
   }
 
-  async function toggleWatched() {
-    const data = await ensureResolved();
-    if (!data) return;
-    const today = new Date().toISOString().slice(0, 10);
+  async function toggleWatchlist() {
+    const wasSaved = saved;
+    setSaved(!wasSaved);
     try {
-      if (watchCount === 0) {
-        // First watch: a bare mark, freely undoable later.
-        const { data: log } = await api.createLog({ tmdb_id: film.tmdb_id, watched_on: today });
-        setWatchCount(1);
-        setBareLogId(log.id);
-      } else if (!hasContentLog && bareLogId) {
-        // Only a bare mark exists so far (no rating/review/quote) — safe to
-        // undo, this is just clearing an accidental tap.
-        await api.deleteLog(bareLogId);
-        setWatchCount(0);
-        setBareLogId(null);
+      if (wasSaved) {
+        const data = await ensureResolved();
+        if (data) await api.removeWatchlist(data.id);
       } else {
-        // A real log (rating/review/quote) exists — double-tap must never
-        // delete that, so this always logs a rewatch instead.
-        await api.createLog({ tmdb_id: film.tmdb_id, watched_on: today, is_rewatch: true });
-        setWatchCount((count) => count + 1);
+        await api.addWatchlist(film.tmdb_id);
       }
     } catch {
-      // Leave state as it was before the attempt — nothing was optimistically changed.
+      setSaved(wasSaved);
     }
   }
 
-  return { resolved, loadingDetail, failed, liked, watchCount, hasContentLog, fetchDetail, openDetail, toggleLike, toggleWatched };
+  // Optimistic, like toggleLike/toggleWatchlist above — updates the badge
+  // instantly instead of waiting on a network round-trip (which, on the
+  // free-tier backend, was visibly laggy), then rolls back only if the
+  // request actually fails.
+  function toggleWatched() {
+    const today = new Date().toISOString().slice(0, 10);
+    if (watchCount === 0) {
+      // First watch: a bare mark, freely undoable later.
+      setWatchCount(1);
+      api
+        .createLog({ tmdb_id: film.tmdb_id, watched_on: today })
+        .then(({ data: log }) => setBareLogId(log.id))
+        .catch(() => setWatchCount(0));
+    } else if (!hasContentLog && bareLogId) {
+      // Only a bare mark exists so far (no rating/review/quote) — safe to
+      // undo, this is just clearing an accidental tap.
+      const idToDelete = bareLogId;
+      setWatchCount(0);
+      setBareLogId(null);
+      api.deleteLog(idToDelete).catch(() => {
+        setWatchCount(1);
+        setBareLogId(idToDelete);
+      });
+    } else {
+      // A real log (rating/review/quote) exists — double-tap must never
+      // delete that, so this always logs a rewatch instead.
+      setWatchCount((count) => count + 1);
+      api.createLog({ tmdb_id: film.tmdb_id, watched_on: today, is_rewatch: true }).catch(() => setWatchCount((count) => count - 1));
+    }
+  }
+
+  return {
+    resolved,
+    loadingDetail,
+    failed,
+    liked,
+    saved,
+    watchCount,
+    hasContentLog,
+    fetchDetail,
+    openDetail,
+    toggleLike,
+    toggleWatchlist,
+    toggleWatched,
+  };
 }
 
 // Persistent status badge, not a burst — reflects current watched/rewatch
@@ -251,15 +284,19 @@ function BelowMenu({
   watched,
   logId,
   liked,
+  saved,
   router,
   toggleLike,
+  toggleWatchlist,
 }: {
   film: FilmCardData;
   watched: boolean | undefined;
   logId: number | string | null | undefined;
   liked: boolean;
+  saved: boolean;
   router: ImperativeRouter;
   toggleLike: () => void;
+  toggleWatchlist: () => void;
 }) {
   return (
     <View style={styles.previewBody}>
@@ -282,8 +319,8 @@ function BelowMenu({
         <Pressable hitSlop={10} onPress={toggleLike}>
           <Ionicons name={liked ? "heart" : "heart-outline"} size={22} color={liked ? colors.orange : colors.paper} />
         </Pressable>
-        <Pressable hitSlop={10} onPress={() => api.addWatchlist(film.tmdb_id).catch(() => {})}>
-          <Ionicons name="bookmark-outline" size={22} color={colors.paper} />
+        <Pressable hitSlop={10} onPress={toggleWatchlist}>
+          <Ionicons name={saved ? "bookmark" : "bookmark-outline"} size={22} color={saved ? colors.gold : colors.paper} />
         </Pressable>
       </View>
     </View>
@@ -305,11 +342,8 @@ function RetryNotice({ onRetry }: { onRetry: () => void }) {
 
 function MorphSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTopStateChange }: SwipeCardProps) {
   const router = useRouter();
-  const { resolved, loadingDetail, failed, liked, watchCount, fetchDetail, openDetail, toggleLike, toggleWatched } = useSwipeCardState(
-    film,
-    isActive,
-    router
-  );
+  const { resolved, loadingDetail, failed, liked, saved, watchCount, fetchDetail, openDetail, toggleLike, toggleWatchlist, toggleWatched } =
+    useSwipeCardState(film, isActive, router);
 
   function handleTopStateChange(atTop: boolean) {
     onTopStateChange(atTop);
@@ -348,7 +382,18 @@ function MorphSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTop
         collapsedRadius={8}
         minContentHeight={resolved ? undefined : pageHeight + 40}
         renderAbove={<AboveBlock film={film} />}
-        renderBelow={<BelowMenu film={film} watched={watched} logId={logId} liked={liked} router={router} toggleLike={toggleLike} />}
+        renderBelow={
+          <BelowMenu
+            film={film}
+            watched={watched}
+            logId={logId}
+            liked={liked}
+            saved={saved}
+            router={router}
+            toggleLike={toggleLike}
+            toggleWatchlist={toggleWatchlist}
+          />
+        }
       >
         {loadingDetail && !resolved ? (
           <ActivityIndicator color={colors.green} style={{ marginTop: 24 }} />
@@ -364,11 +409,8 @@ function MorphSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTop
 
 function SheetSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTopStateChange }: SwipeCardProps) {
   const router = useRouter();
-  const { resolved, loadingDetail, failed, fetchDetail, liked, watchCount, toggleLike, toggleWatched } = useSwipeCardState(
-    film,
-    isActive,
-    router
-  );
+  const { resolved, loadingDetail, failed, fetchDetail, liked, saved, watchCount, toggleLike, toggleWatchlist, toggleWatched } =
+    useSwipeCardState(film, isActive, router);
   const sheetRef = useRef<BottomSheet>(null);
   const lastTapRef = useRef(0);
   const heartScale = useSharedValue(0);
@@ -448,7 +490,16 @@ function SheetSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTop
           </View>
         </Pressable>
 
-        <BelowMenu film={film} watched={watched} logId={logId} liked={liked} router={router} toggleLike={toggleLike} />
+        <BelowMenu
+          film={film}
+          watched={watched}
+          logId={logId}
+          liked={liked}
+          saved={saved}
+          router={router}
+          toggleLike={toggleLike}
+          toggleWatchlist={toggleWatchlist}
+        />
 
         <Pressable style={styles.chevronButton} onPress={() => sheetRef.current?.snapToIndex(0)} hitSlop={12}>
           <Ionicons name="chevron-up" size={20} color={colors.paper} />

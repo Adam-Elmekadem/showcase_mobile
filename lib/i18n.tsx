@@ -11,7 +11,7 @@ type LocaleContextValue = {
 
 const LocaleContext = createContext<LocaleContextValue | null>(null);
 
-export function LocaleProvider({ children, initialLanguage = "ar" }: { children: React.ReactNode; initialLanguage?: Language }) {
+export function LocaleProvider({ children, initialLanguage = "en" }: { children: React.ReactNode; initialLanguage?: Language }) {
   const [language, setLanguage] = useState<Language>(initialLanguage);
 
   const toggleLanguage = useCallback(() => {

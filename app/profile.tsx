@@ -44,6 +44,12 @@ export default function ProfileScreen() {
   const [lists, setLists] = useState<ApiList[]>([]);
   const [contentLoading, setContentLoading] = useState(true);
 
+  // Depend on the username, not the whole user object — setUser() after
+  // editing profile fields (avatar, name, bio, ...) replaces that object
+  // wholesale even when only one field changed, and since these are wrapped
+  // in useFocusEffect, a changed callback identity re-triggers a full
+  // reload immediately (not just on an actual focus event) — which is what
+  // turned a simple avatar change into the whole profile re-fetching.
   const load = useCallback(async () => {
     if (!user) return;
     try {
@@ -52,7 +58,8 @@ export default function ProfileScreen() {
     } catch {
       setStats(null);
     }
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.username]);
 
   useFocusEffect(
     useCallback(() => {
@@ -70,7 +77,8 @@ export default function ProfileScreen() {
     setLogs(logsRes.status === "fulfilled" ? logsRes.value.data : []);
     setLists(listsRes.status === "fulfilled" ? listsRes.value.data : []);
     setContentLoading(false);
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.username]);
 
   useFocusEffect(
     useCallback(() => {
