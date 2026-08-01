@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Pressable } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { api, ApiFilm, Genre, SearchResult } from "@/lib/api";
@@ -11,6 +12,16 @@ import { AppLogo } from "@/components/AppLogo";
 import { SearchSheet } from "@/components/SearchSheet";
 
 const GENRE_ROW_LIMIT = 8;
+const CACHE_KEY = "explore-cache-v1";
+
+type ExploreCache = {
+  genres: Genre[];
+  newest: SearchResult[];
+  upcoming: SearchResult[];
+  bestOf: SearchResult[];
+  fromFriends: ApiFilm[];
+  genreFilms: Record<number, SearchResult[]>;
+};
 
 function withPosters<T extends { poster_url: string | null }>(films: T[]) {
   return films.filter((film) => !!film.poster_url);
@@ -32,7 +43,33 @@ export default function ExploreScreen() {
     let cancelled = false;
 
     async function load() {
-      setLoading(true);
+      // Cache-first: many Android devices fully kill this app's process
+      // when it's backgrounded, so returning to it boots a fresh JS
+      // instance and every mount effect (this one included) runs from
+      // scratch — with no cache, that means a blank spinner and a 2-3s
+      // reload each time, even though nothing actually changed. Showing
+      // the last-loaded content immediately while refreshing underneath it
+      // makes that invisible; the spinner only shows when there's truly
+      // nothing to show yet.
+      const cachedRaw = await AsyncStorage.getItem(CACHE_KEY).catch(() => null);
+      let hadCache = false;
+      if (cachedRaw && !cancelled) {
+        try {
+          const cached: ExploreCache = JSON.parse(cachedRaw);
+          setGenres(cached.genres);
+          setNewest(cached.newest);
+          setUpcoming(cached.upcoming);
+          setBestOf(cached.bestOf);
+          setFromFriends(cached.fromFriends);
+          setGenreFilms(cached.genreFilms);
+          setLoading(false);
+          hadCache = true;
+        } catch {
+          // Malformed cache — fall through to a normal loading fetch.
+        }
+      }
+      if (!hadCache) setLoading(true);
+
       const { data: genreList } = await api.getGenres().catch(() => ({ data: [] as Genre[] }));
       if (cancelled) return;
       setGenres(genreList);
@@ -47,32 +84,38 @@ export default function ExploreScreen() {
       ]);
       if (cancelled) return;
 
-      setNewest(newestRes.status === "fulfilled" ? withPosters(newestRes.value.data) : []);
-      setUpcoming(upcomingRes.status === "fulfilled" ? withPosters(upcomingRes.value.data) : []);
-      setBestOf(bestOfRes.status === "fulfilled" ? withPosters(bestOfRes.value.data) : []);
+      const newest = newestRes.status === "fulfilled" ? withPosters(newestRes.value.data) : [];
+      const upcoming = upcomingRes.status === "fulfilled" ? withPosters(upcomingRes.value.data) : [];
+      const bestOf = bestOfRes.status === "fulfilled" ? withPosters(bestOfRes.value.data) : [];
+      setNewest(newest);
+      setUpcoming(upcoming);
+      setBestOf(bestOf);
 
+      let fromFriends: ApiFilm[] = [];
       if (friendsRes.status === "fulfilled") {
         const seen = new Set<number>();
-        const films: ApiFilm[] = [];
         for (const log of friendsRes.value.data) {
           if (log.film && log.film.poster_url && !seen.has(log.film.id)) {
             seen.add(log.film.id);
-            films.push(log.film);
+            fromFriends.push(log.film);
           }
         }
-        setFromFriends(films);
-      } else {
-        setFromFriends([]);
       }
+      setFromFriends(fromFriends);
 
-      const map: Record<number, SearchResult[]> = {};
+      const genreFilms: Record<number, SearchResult[]> = {};
       topGenres.forEach((genre, index) => {
         const result = genreResults[index];
-        map[genre.id] = result.status === "fulfilled" ? withPosters(result.value.data) : [];
+        genreFilms[genre.id] = result.status === "fulfilled" ? withPosters(result.value.data) : [];
       });
-      setGenreFilms(map);
+      setGenreFilms(genreFilms);
 
       setLoading(false);
+
+      AsyncStorage.setItem(
+        CACHE_KEY,
+        JSON.stringify({ genres: genreList, newest, upcoming, bestOf, fromFriends, genreFilms } satisfies ExploreCache)
+      ).catch(() => {});
     }
 
     load();

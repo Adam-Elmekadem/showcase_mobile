@@ -193,16 +193,21 @@ export function ScrollMorphHeader({
   // real failure mode this screen has hit before.
   const doubleTapGesture = Gesture.Tap()
     .numberOfTaps(2)
-    .onEnd(() => {
-      if (!onImageDoubleTap) return;
+    .onEnd((_event, success) => {
+      // onEnd fires even when the gesture didn't actually complete (e.g.
+      // this tap got preempted) — without checking `success`, the single
+      // tap below would still fire its handler right after a real double
+      // tap, sending you off to the full detail page unexpectedly.
+      if (!success || !onImageDoubleTap) return;
       triggerTapBurst();
       runOnJS(onImageDoubleTap)();
     });
 
   const singleTapGesture = Gesture.Tap()
     .numberOfTaps(1)
-    .onEnd(() => {
-      if (onImageTap) runOnJS(onImageTap)();
+    .onEnd((_event, success) => {
+      if (!success || !onImageTap) return;
+      runOnJS(onImageTap)();
     });
 
   const tapGesture = Gesture.Exclusive(doubleTapGesture, singleTapGesture);

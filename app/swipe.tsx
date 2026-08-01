@@ -262,16 +262,9 @@ function BelowMenu({
   router: ImperativeRouter;
   toggleLike: () => void;
 }) {
-  const rating = film.viewer_rating;
   return (
     <View style={styles.previewBody}>
       {film.year ? <Text style={styles.year}>{film.year}</Text> : null}
-      {rating ? (
-        <Text style={styles.stars}>
-          {"★".repeat(Math.max(0, Math.min(5, Math.round(rating))))}
-          {"☆".repeat(Math.max(0, 5 - Math.round(rating)))}
-        </Text>
-      ) : null}
 
       <View style={styles.iconMenu}>
         <Pressable
@@ -407,15 +400,21 @@ function SheetSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTop
   // in ScrollMorphHeader) rather than a JS Date.now()/setTimeout race.
   const doubleTapGesture = Gesture.Tap()
     .numberOfTaps(2)
-    .onEnd(() => {
+    .onEnd((_event, success) => {
+      // See the matching comment in ScrollMorphHeader.tsx — onEnd fires even
+      // on a preempted/failed gesture, so checking `success` is what stops
+      // the single-tap navigation below from also firing after a real
+      // double tap.
+      if (!success) return;
       triggerTapBurst();
       runOnJS(toggleWatched)();
     });
 
   const singleTapGesture = Gesture.Tap()
     .numberOfTaps(1)
-    .onEnd(() => {
-      if (resolved) runOnJS(router.push)(`/film/${resolved.slug}`);
+    .onEnd((_event, success) => {
+      if (!success || !resolved) return;
+      runOnJS(router.push)(`/film/${resolved.slug}`);
     });
 
   const posterTapGesture = Gesture.Exclusive(doubleTapGesture, singleTapGesture);
@@ -511,7 +510,6 @@ const styles = StyleSheet.create({
   ratingText: { color: colors.gold, fontFamily: font.display, fontSize: 15 },
   previewBody: { padding: 18 },
   year: { color: colors.paperMuted, fontSize: 12 },
-  stars: { color: colors.gold, fontSize: 15, marginTop: 8 },
   iconMenu: { flexDirection: "row", alignItems: "center", justifyContent: "space-around", marginTop: 12, height: 40 },
   sheetCenter: { flex: 1, justifyContent: "center", paddingHorizontal: 24 },
   sheetPoster: { alignSelf: "center", borderRadius: 28, overflow: "hidden", backgroundColor: colors.surface2 },
