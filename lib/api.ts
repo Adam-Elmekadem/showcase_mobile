@@ -218,7 +218,10 @@ export async function setToken(token: string | null) {
   else await SecureStore.deleteItemAsync(TOKEN_KEY);
 }
 
-const REQUEST_TIMEOUT_MS = 10000;
+// The hosted API (Render free tier) sleeps after 15 min idle and can take
+// up to ~60s to wake on the next request — this has to comfortably outlast
+// that cold start, or every first request after idle looks like a failure.
+const REQUEST_TIMEOUT_MS = 60000;
 
 type RequestOptions = RequestInit & { timeoutMs?: number };
 
