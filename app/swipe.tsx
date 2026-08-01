@@ -22,8 +22,7 @@ import { FloatingBackButton } from "@/components/FloatingBackButton";
 // compute where "centered at rest" sits and to keep the scroll content
 // gap-free, so an approximate estimate is fine.
 const ABOVE_HEIGHT = 114; // title + genre chips + rating row
-const BELOW_HEIGHT = 90; // year + your rating + icon menu (sheet mode only)
-const MORPH_BELOW_HEIGHT = 50; // year + your rating, no icon menu (see showIconMenu)
+const BELOW_HEIGHT = 90; // year + your rating + icon menu
 const POSTER_ASPECT = 0.69; // matches FilmCard's poster ratio elsewhere in the app
 
 export default function SwipeScreen() {
@@ -106,6 +105,15 @@ function useSwipeCardState(film: FilmCardData, isActive: boolean, router: Impera
   // was: not a layout bug, a swallowed fetch failure.
   const [failed, setFailed] = useState(false);
   const [liked, setLiked] = useState(false);
+  // Watch count and "has content" are tracked separately from a single
+  // viewer_log_id: once any log for this film has a rating/review/quote
+  // attached, double-tap must never delete it — it can only add a rewatch.
+  // bareLogId is only meaningful while watchCount is exactly 1 and
+  // hasContentLog is false (a plain double-tap-to-watch mark with nothing
+  // else attached yet, the one case that's safe to undo).
+  const [watchCount, setWatchCount] = useState(0);
+  const [hasContentLog, setHasContentLog] = useState(false);
+  const [bareLogId, setBareLogId] = useState<number | null>(null);
   const fetchedRef = useRef(false);
 
   function fetchDetail() {
@@ -118,6 +126,9 @@ function useSwipeCardState(film: FilmCardData, isActive: boolean, router: Impera
       .then(({ data }) => {
         setResolved(data);
         setLiked(data.viewer_liked ?? false);
+        setWatchCount(data.viewer_watch_count ?? 0);
+        setHasContentLog(data.viewer_has_content_log ?? false);
+        setBareLogId(!data.viewer_has_content_log && data.viewer_log_id ? data.viewer_log_id : null);
       })
       .catch(() => {
         fetchedRef.current = false;
@@ -168,7 +179,47 @@ function useSwipeCardState(film: FilmCardData, isActive: boolean, router: Impera
     }
   }
 
-  return { resolved, loadingDetail, failed, liked, fetchDetail, openDetail, toggleLike };
+  async function toggleWatched() {
+    const data = await ensureResolved();
+    if (!data) return;
+    const today = new Date().toISOString().slice(0, 10);
+    try {
+      if (watchCount === 0) {
+        // First watch: a bare mark, freely undoable later.
+        const { data: log } = await api.createLog({ tmdb_id: film.tmdb_id, watched_on: today });
+        setWatchCount(1);
+        setBareLogId(log.id);
+      } else if (!hasContentLog && bareLogId) {
+        // Only a bare mark exists so far (no rating/review/quote) — safe to
+        // undo, this is just clearing an accidental tap.
+        await api.deleteLog(bareLogId);
+        setWatchCount(0);
+        setBareLogId(null);
+      } else {
+        // A real log (rating/review/quote) exists — double-tap must never
+        // delete that, so this always logs a rewatch instead.
+        await api.createLog({ tmdb_id: film.tmdb_id, watched_on: today, is_rewatch: true });
+        setWatchCount((count) => count + 1);
+      }
+    } catch {
+      // Leave state as it was before the attempt — nothing was optimistically changed.
+    }
+  }
+
+  return { resolved, loadingDetail, failed, liked, watchCount, hasContentLog, fetchDetail, openDetail, toggleLike, toggleWatched };
+}
+
+// Persistent status badge, not a burst — reflects current watched/rewatch
+// state at a glance rather than firing once and fading, since watched state
+// (unlike the double-tap gesture that changes it) needs to stay visible.
+function WatchedBadge({ watchCount }: { watchCount: number }) {
+  const watched = watchCount > 0;
+  return (
+    <View style={[styles.watchedBadge, watched && styles.watchedBadgeActive]}>
+      <Ionicons name={watched ? "eye" : "eye-outline"} size={13} color={watched ? colors.orange : colors.paper} />
+      {watchCount > 1 && <Text style={styles.watchedBadgeText}>{watchCount}</Text>}
+    </View>
+  );
 }
 
 function AboveBlock({ film, showRating = true }: { film: FilmCardData; showRating?: boolean }) {
@@ -203,7 +254,6 @@ function BelowMenu({
   liked,
   router,
   toggleLike,
-  showIconMenu = true,
 }: {
   film: FilmCardData;
   watched: boolean | undefined;
@@ -211,13 +261,6 @@ function BelowMenu({
   liked: boolean;
   router: ImperativeRouter;
   toggleLike: () => void;
-  // Morph mode already surfaces a complete action row (Watched/Like/
-  // Watchlist/Showcase) via FilmDetailBody once you scroll into it, so its
-  // own pinned icon menu here is redundant — and incomplete besides, since
-  // it has no "watched" action of its own. Sheet mode has no scroll-in
-  // equivalent (FilmDetailBody only appears once the sheet is opened), so
-  // it keeps this as its only quick-access menu.
-  showIconMenu?: boolean;
 }) {
   const rating = film.viewer_rating;
   return (
@@ -230,29 +273,27 @@ function BelowMenu({
         </Text>
       ) : null}
 
-      {showIconMenu && (
-        <View style={styles.iconMenu}>
-          <Pressable
-            hitSlop={10}
-            onPress={() =>
-              watched
-                ? router.push({ pathname: "/log/[tmdbId]", params: { tmdbId: String(film.tmdb_id), logId: logId ? String(logId) : undefined } })
-                : router.push(`/log/${film.tmdb_id}`)
-            }
-          >
-            <Ionicons name={watched ? "create-outline" : "add-circle-outline"} size={22} color={colors.paper} />
-          </Pressable>
-          <Pressable hitSlop={10} onPress={() => router.push(`/quote/${film.tmdb_id}`)}>
-            <Ionicons name="chatbox-ellipses-outline" size={22} color={colors.paper} />
-          </Pressable>
-          <Pressable hitSlop={10} onPress={toggleLike}>
-            <Ionicons name={liked ? "heart" : "heart-outline"} size={22} color={liked ? colors.orange : colors.paper} />
-          </Pressable>
-          <Pressable hitSlop={10} onPress={() => api.addWatchlist(film.tmdb_id).catch(() => {})}>
-            <Ionicons name="bookmark-outline" size={22} color={colors.paper} />
-          </Pressable>
-        </View>
-      )}
+      <View style={styles.iconMenu}>
+        <Pressable
+          hitSlop={10}
+          onPress={() =>
+            watched
+              ? router.push({ pathname: "/log/[tmdbId]", params: { tmdbId: String(film.tmdb_id), logId: logId ? String(logId) : undefined } })
+              : router.push(`/log/${film.tmdb_id}`)
+          }
+        >
+          <Ionicons name={watched ? "create-outline" : "add-circle-outline"} size={22} color={colors.paper} />
+        </Pressable>
+        <Pressable hitSlop={10} onPress={() => router.push(`/quote/${film.tmdb_id}`)}>
+          <Ionicons name="chatbox-ellipses-outline" size={22} color={colors.paper} />
+        </Pressable>
+        <Pressable hitSlop={10} onPress={toggleLike}>
+          <Ionicons name={liked ? "heart" : "heart-outline"} size={22} color={liked ? colors.orange : colors.paper} />
+        </Pressable>
+        <Pressable hitSlop={10} onPress={() => api.addWatchlist(film.tmdb_id).catch(() => {})}>
+          <Ionicons name="bookmark-outline" size={22} color={colors.paper} />
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -272,7 +313,11 @@ function RetryNotice({ onRetry }: { onRetry: () => void }) {
 
 function MorphSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTopStateChange }: SwipeCardProps) {
   const router = useRouter();
-  const { resolved, loadingDetail, failed, liked, fetchDetail, openDetail, toggleLike } = useSwipeCardState(film, isActive, router);
+  const { resolved, loadingDetail, failed, liked, watchCount, fetchDetail, openDetail, toggleLike, toggleWatched } = useSwipeCardState(
+    film,
+    isActive,
+    router
+  );
 
   function handleTopStateChange(atTop: boolean) {
     onTopStateChange(atTop);
@@ -280,7 +325,7 @@ function MorphSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTop
   }
 
   const imageWidth = pageWidth - 48;
-  const watched = resolved?.viewer_watched ?? film.viewer_watched;
+  const watched = watchCount > 0;
   const logId = resolved?.viewer_log_id ?? film.viewer_log_id;
 
   return (
@@ -290,7 +335,10 @@ function MorphSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTop
         title={film.title}
         onTopStateChange={handleTopStateChange}
         onImageTap={openDetail}
-        onImageDoubleTap={toggleLike}
+        onImageDoubleTap={toggleWatched}
+        doubleTapBurstIcon="eye"
+        doubleTapBurstColor={colors.orange}
+        topLeftBadge={<WatchedBadge watchCount={watchCount} />}
         containerWidth={pageWidth}
         containerHeight={pageHeight}
         centerAtRest
@@ -299,7 +347,7 @@ function MorphSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTop
         crossfadeOverlayTitle
         aboveHeight={ABOVE_HEIGHT}
         collapseAboveOnScroll
-        belowHeight={MORPH_BELOW_HEIGHT}
+        belowHeight={BELOW_HEIGHT}
         collapseBelowOnScroll
         initialHeight={imageWidth / POSTER_ASPECT}
         collapsedHeight={pageHeight * 0.28}
@@ -308,12 +356,12 @@ function MorphSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTop
         collapsedRadius={8}
         minContentHeight={resolved ? undefined : pageHeight + 40}
         renderAbove={<AboveBlock film={film} />}
-        renderBelow={<BelowMenu film={film} watched={watched} logId={logId} liked={liked} router={router} toggleLike={toggleLike} showIconMenu={false} />}
+        renderBelow={<BelowMenu film={film} watched={watched} logId={logId} liked={liked} router={router} toggleLike={toggleLike} />}
       >
         {loadingDetail && !resolved ? (
           <ActivityIndicator color={colors.green} style={{ marginTop: 24 }} />
         ) : resolved ? (
-          <FilmDetailBody film={resolved} hideMeta />
+          <FilmDetailBody film={resolved} hideMeta hideActions />
         ) : failed ? (
           <RetryNotice onRetry={fetchDetail} />
         ) : null}
@@ -324,12 +372,16 @@ function MorphSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTop
 
 function SheetSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTopStateChange }: SwipeCardProps) {
   const router = useRouter();
-  const { resolved, loadingDetail, failed, fetchDetail, liked, toggleLike } = useSwipeCardState(film, isActive, router);
+  const { resolved, loadingDetail, failed, fetchDetail, liked, watchCount, toggleLike, toggleWatched } = useSwipeCardState(
+    film,
+    isActive,
+    router
+  );
   const sheetRef = useRef<BottomSheet>(null);
   const heartScale = useSharedValue(0);
   const heartOpacity = useSharedValue(0);
 
-  const watched = resolved?.viewer_watched ?? film.viewer_watched;
+  const watched = watchCount > 0;
   const logId = resolved?.viewer_log_id ?? film.viewer_log_id;
   const imageWidth = pageWidth - 48;
   // The rating moves onto the poster itself (a badge, like FilmCard's own
@@ -344,7 +396,7 @@ function SheetSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTop
   const posterHeight = Math.min(imageWidth / POSTER_ASPECT, maxPosterHeight);
   const hasRating = typeof film.vote_average === "number" && film.vote_average > 0;
 
-  function triggerHeartBurst() {
+  function triggerTapBurst() {
     heartOpacity.value = 1;
     heartScale.value = 0.3;
     heartScale.value = withSpring(1.15, { damping: 9, stiffness: 160 });
@@ -356,8 +408,8 @@ function SheetSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTop
   const doubleTapGesture = Gesture.Tap()
     .numberOfTaps(2)
     .onEnd(() => {
-      triggerHeartBurst();
-      runOnJS(toggleLike)();
+      triggerTapBurst();
+      runOnJS(toggleWatched)();
     });
 
   const singleTapGesture = Gesture.Tap()
@@ -394,8 +446,11 @@ function SheetSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTop
               </View>
             )}
             <Animated.View pointerEvents="none" style={[styles.heartBurst, heartStyle]}>
-              <Ionicons name="heart" size={84} color={colors.paper} />
+              <Ionicons name="eye" size={84} color={colors.orange} />
             </Animated.View>
+            <View pointerEvents="none" style={styles.topLeftBadgeWrap}>
+              <WatchedBadge watchCount={watchCount} />
+            </View>
           </View>
         </GestureDetector>
 
@@ -419,7 +474,7 @@ function SheetSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTop
           {loadingDetail && !resolved ? (
             <ActivityIndicator color={colors.green} style={{ marginTop: 24 }} />
           ) : resolved ? (
-            <FilmDetailBody film={resolved} hideMeta inBottomSheet />
+            <FilmDetailBody film={resolved} hideMeta hideActions inBottomSheet />
           ) : failed ? (
             <RetryNotice onRetry={fetchDetail} />
           ) : null}
@@ -476,9 +531,24 @@ const styles = StyleSheet.create({
     borderColor: colors.green,
   },
   posterRatingBadgeText: { color: colors.paper, fontFamily: font.display, fontSize: 13 },
+  watchedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    minWidth: 26,
+    height: 26,
+    borderRadius: 13,
+    paddingHorizontal: 8,
+    backgroundColor: "rgba(9,9,16,0.72)",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  watchedBadgeActive: { borderColor: colors.orange },
+  watchedBadgeText: { color: colors.orange, fontFamily: font.display, fontSize: 13 },
   fallback: { alignItems: "center", justifyContent: "center", padding: 24, backgroundColor: colors.surface2 },
   fallbackText: { color: colors.muted, fontSize: 16, textAlign: "center", fontFamily: font.display },
   heartBurst: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" },
+  topLeftBadgeWrap: { position: "absolute", top: 12, left: 12 },
   chevronButton: {
     alignSelf: "center",
     width: 40,

@@ -22,6 +22,7 @@ import { GlassPanel } from "@/components/GlassPanel";
 export function FilmDetailBody({
   film,
   hideMeta = false,
+  hideActions = false,
   inBottomSheet = false,
 }: {
   film: ApiFilm;
@@ -30,6 +31,12 @@ export function FilmDetailBody({
    * title/genre-chips/rating block above the poster), so it isn't duplicated
    * the moment this body scrolls into view. */
   hideMeta?: boolean;
+  /** Hides the Watched/Like/Watchlist/Showcase row and the Log&review/Quote
+   * buttons — set true when the caller already has its own equivalent quick
+   * menu (both the swipe deck's morph and sheet cards do), so this isn't a
+   * second, redundant copy of the same actions once this body scrolls into
+   * view. */
+  hideActions?: boolean;
   /** Set true when this body is rendered inside @gorhom/bottom-sheet (the
    * swipe deck's sheet mode) — its horizontal PeopleRow/HorizontalFilms rows
    * need a gesture-handler FlatList there to scroll correctly, but that same
@@ -113,7 +120,7 @@ export function FilmDetailBody({
         </View>
       )}
 
-      {user && (
+      {!hideActions && user && (
         <View style={styles.actionsRow}>
           <ActionButton
             icon={watched ? "eye" : "eye-outline"}
@@ -132,22 +139,23 @@ export function FilmDetailBody({
         </View>
       )}
 
-      {user ? (
-        <View style={styles.logRow}>
-          <Pressable style={[styles.logButton, styles.logButtonFlex]} onPress={() => router.push(`/log/${film.tmdb_id}`)}>
-            <Ionicons name="film-outline" size={16} color={colors.paper} />
-            <Text style={styles.logButtonText}>{pick(language, "سجّل ومراجعة", "Log & review")}</Text>
+      {!hideActions &&
+        (user ? (
+          <View style={styles.logRow}>
+            <Pressable style={[styles.logButton, styles.logButtonFlex]} onPress={() => router.push(`/log/${film.tmdb_id}`)}>
+              <Ionicons name="film-outline" size={16} color={colors.paper} />
+              <Text style={styles.logButtonText}>{pick(language, "سجّل ومراجعة", "Log & review")}</Text>
+            </Pressable>
+            <Pressable style={[styles.quoteButton, styles.logButtonFlex]} onPress={() => router.push(`/quote/${film.tmdb_id}`)}>
+              <Ionicons name="chatbox-ellipses-outline" size={16} color={colors.gold} />
+              <Text style={styles.quoteButtonText}>{pick(language, "اقتباس", "Quote")}</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable style={styles.logButtonOutline} onPress={() => router.push("/login")}>
+            <Text style={styles.logButtonOutlineText}>{pick(language, "سجّل الدخول للتسجيل والمراجعة", "Sign in to log & review")}</Text>
           </Pressable>
-          <Pressable style={[styles.quoteButton, styles.logButtonFlex]} onPress={() => router.push(`/quote/${film.tmdb_id}`)}>
-            <Ionicons name="chatbox-ellipses-outline" size={16} color={colors.gold} />
-            <Text style={styles.quoteButtonText}>{pick(language, "اقتباس", "Quote")}</Text>
-          </Pressable>
-        </View>
-      ) : (
-        <Pressable style={styles.logButtonOutline} onPress={() => router.push("/login")}>
-          <Text style={styles.logButtonOutlineText}>{pick(language, "سجّل الدخول للتسجيل والمراجعة", "Sign in to log & review")}</Text>
-        </Pressable>
-      )}
+        ))}
 
       {film.overview && (
         <View style={styles.section}>

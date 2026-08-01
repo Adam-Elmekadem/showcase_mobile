@@ -46,6 +46,8 @@ export type ApiFilm = {
   viewer_watched?: boolean;
   viewer_rating?: number | null;
   viewer_log_id?: number | null;
+  viewer_watch_count?: number;
+  viewer_has_content_log?: boolean;
   directors?: ApiPerson[];
   credits?: Record<string, ApiPerson[]>;
 };

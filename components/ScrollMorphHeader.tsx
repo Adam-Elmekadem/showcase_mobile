@@ -73,6 +73,9 @@ export function ScrollMorphHeader({
   crossfadeOverlayTitle = false,
   onImageTap,
   onImageDoubleTap,
+  doubleTapBurstIcon = "heart",
+  doubleTapBurstColor,
+  topLeftBadge,
 }: {
   image: string | null;
   title: string;
@@ -144,8 +147,16 @@ export function ScrollMorphHeader({
   crossfadeOverlayTitle?: boolean;
   /** Fires on a single tap of the image (e.g. open the film's full detail page). */
   onImageTap?: () => void;
-  /** Fires on a double tap of the image (e.g. like the film), instead of onImageTap. */
+  /** Fires on a double tap of the image (e.g. toggle watched), instead of onImageTap. */
   onImageDoubleTap?: () => void;
+  /** Icon shown in the brief center-screen pulse on double-tap. */
+  doubleTapBurstIcon?: React.ComponentProps<typeof Ionicons>["name"];
+  /** Color of the double-tap burst icon — defaults to colors.paper. */
+  doubleTapBurstColor?: string;
+  /** Persistent status badge pinned to the image's top-left corner (e.g. a
+   * watched/rewatch-count indicator) — unaffected by scroll, unlike
+   * renderAbove/renderBelow. */
+  topLeftBadge?: React.ReactNode;
 }) {
   const scrollY = useSharedValue(0);
   const heartScale = useSharedValue(0);
@@ -167,7 +178,7 @@ export function ScrollMorphHeader({
     [onTopStateChange]
   );
 
-  function triggerHeartBurst() {
+  function triggerTapBurst() {
     heartOpacity.value = 1;
     heartScale.value = 0.3;
     heartScale.value = withSpring(1.15, { damping: 9, stiffness: 160 });
@@ -184,7 +195,7 @@ export function ScrollMorphHeader({
     .numberOfTaps(2)
     .onEnd(() => {
       if (!onImageDoubleTap) return;
-      triggerHeartBurst();
+      triggerTapBurst();
       runOnJS(onImageDoubleTap)();
     });
 
@@ -302,8 +313,13 @@ export function ScrollMorphHeader({
             </View>
           </GestureDetector>
           <Animated.View pointerEvents="none" style={[styles.heartBurst, heartStyle]}>
-            <Ionicons name="heart" size={84} color={colors.paper} />
+            <Ionicons name={doubleTapBurstIcon} size={84} color={doubleTapBurstColor ?? colors.paper} />
           </Animated.View>
+          {topLeftBadge && (
+            <View pointerEvents="none" style={styles.topLeftBadgeWrap}>
+              {topLeftBadge}
+            </View>
+          )}
           {showOverlayTitle && (
             <>
               <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.scrim, scrimStyle]} />
@@ -344,6 +360,7 @@ const styles = StyleSheet.create({
   fallbackText: { color: colors.muted, fontSize: 16, textAlign: "center", fontFamily: font.display },
   scrim: { backgroundColor: colors.ink },
   heartBurst: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" },
+  topLeftBadgeWrap: { position: "absolute", top: 12, left: 12 },
   titleWrap: { position: "absolute", left: 0, right: 0, bottom: 0, padding: 18 },
   title: { color: colors.paper, fontFamily: font.display, fontSize: 26, letterSpacing: 0.5 },
 });
