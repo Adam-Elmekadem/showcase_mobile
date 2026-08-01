@@ -4,6 +4,7 @@ import { Image } from "expo-image";
 import ViewShot from "react-native-view-shot";
 import { ApiLog } from "@/lib/api";
 import { StarRating } from "@/components/StarRating";
+import { BrandMark } from "@/components/BrandMark";
 import { colors } from "@/lib/theme";
 
 export const CARD_WIDTH = 320;
@@ -43,7 +44,14 @@ export const ShareCard = forwardRef<
       );
     }
 
-    const bodySnippet = log.quote ? snippet(log.quote, 220) : log.review ? snippet(log.review, 220) : null;
+    // The review card shows the review text when one exists, only falling
+    // back to the quote if there's no review — previously this checked
+    // log.quote first unconditionally, so a log with both showed the quote
+    // on the "review" card too.
+    const reviewSnippet = log.review ? snippet(log.review, 220) : null;
+    const quoteSnippet = log.quote ? snippet(log.quote, 220) : null;
+    const bodySnippet = reviewSnippet ?? quoteSnippet;
+    const bodyIsQuote = !reviewSnippet && Boolean(quoteSnippet);
 
     return (
       <ViewShot ref={ref} options={{ format: "png", quality: 1 }}>
@@ -66,7 +74,7 @@ export const ShareCard = forwardRef<
             </View>
             {bodySnippet && (
               <Text style={styles.reviewText} numberOfLines={5}>
-                {log.quote ? `“${bodySnippet}”` : bodySnippet}
+                {bodyIsQuote ? `“${bodySnippet}”` : bodySnippet}
               </Text>
             )}
             <Text style={styles.username}>@{log.user?.username}</Text>
@@ -80,11 +88,7 @@ export const ShareCard = forwardRef<
 function Brand({ style }: { style?: object }) {
   return (
     <View style={[styles.brand, style]}>
-      <View style={styles.brandMark}>
-        <View style={[styles.brandBar, { height: 10, backgroundColor: colors.orange }]} />
-        <View style={[styles.brandBar, { height: 16, backgroundColor: colors.green }]} />
-        <View style={[styles.brandBar, { height: 13, backgroundColor: "#63c4b9" }]} />
-      </View>
+      <BrandMark size={16} />
       <Text style={styles.brandText}>showcase</Text>
     </View>
   );
@@ -104,8 +108,6 @@ const styles = StyleSheet.create({
   brand: { position: "absolute", flexDirection: "row", alignItems: "center", gap: 6, zIndex: 5 },
   brandOnReview: { top: 14, left: 16 },
   brandOnQuote: { bottom: 16, left: 0, right: 0, justifyContent: "center" },
-  brandMark: { flexDirection: "row", gap: 2, alignItems: "flex-end" },
-  brandBar: { width: 5, borderRadius: 2 },
   brandText: { color: colors.paper, fontSize: 12, fontWeight: "700" },
   quoteCard: { minHeight: 400, borderWidth: 1, borderColor: colors.border },
   quoteImageWrap: { width: "100%", height: 210, backgroundColor: colors.surface2 },

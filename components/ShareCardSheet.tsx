@@ -87,7 +87,11 @@ export function ShareCardSheet({ visible, onClose, log }: { visible: boolean; on
     setBusy("save");
     try {
       const MediaLibrary = await import("expo-media-library");
-      const permission = await MediaLibrary.requestPermissionsAsync();
+      // Write-only: this only ever saves a newly generated image, it never
+      // reads existing photos. Requesting full/read access instead pulls in
+      // Android 14+'s "select which photos to allow" picker — a read-access
+      // flow that's irrelevant here and just confuses the save action.
+      const permission = await MediaLibrary.requestPermissionsAsync(true);
       if (!permission.granted) {
         setMessage(pick(language, "بحاجة إلى إذن الوصول للصور للحفظ.", "Photo library permission is needed to save."));
         return;
