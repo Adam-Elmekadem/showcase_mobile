@@ -419,7 +419,7 @@ function SheetSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTop
           {loadingDetail && !resolved ? (
             <ActivityIndicator color={colors.green} style={{ marginTop: 24 }} />
           ) : resolved ? (
-            <FilmDetailBody film={resolved} hideMeta />
+            <FilmDetailBody film={resolved} hideMeta inBottomSheet />
           ) : failed ? (
             <RetryNotice onRetry={fetchDetail} />
           ) : null}

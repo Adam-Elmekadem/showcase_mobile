@@ -1,19 +1,32 @@
 import React from "react";
-import { View, Text, Pressable, StyleSheet } from "react-native";
-import { FlatList } from "react-native-gesture-handler";
+import { View, Text, Pressable, StyleSheet, FlatList as RNFlatList } from "react-native";
+import { FlatList as GHFlatList } from "react-native-gesture-handler";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { colors } from "@/lib/theme";
 import { ApiPerson } from "@/lib/api";
 
-export function PeopleRow({ title, people }: { title: string; people: ApiPerson[] }) {
+export function PeopleRow({
+  title,
+  people,
+  inBottomSheet = false,
+}: {
+  title: string;
+  people: ApiPerson[];
+  // See the matching comment in HorizontalFilms.tsx — only opt into the
+  // gesture-handler FlatList where it's nested inside @gorhom/bottom-sheet;
+  // elsewhere (plain ScrollView contexts) it fights the outer scroll instead
+  // of cooperating with it.
+  inBottomSheet?: boolean;
+}) {
   const router = useRouter();
   if (!people || people.length === 0) return null;
+  const List = inBottomSheet ? GHFlatList : RNFlatList;
 
   return (
     <View style={styles.section}>
       <Text style={styles.title}>{title}</Text>
-      <FlatList
+      <List
         horizontal
         data={people}
         keyExtractor={(item, index) => `${item.slug}-${index}`}

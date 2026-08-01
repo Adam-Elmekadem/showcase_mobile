@@ -22,6 +22,7 @@ import { GlassPanel } from "@/components/GlassPanel";
 export function FilmDetailBody({
   film,
   hideMeta = false,
+  inBottomSheet = false,
 }: {
   film: ApiFilm;
   /** Hides the year/runtime/genre + rating row at the top — set true when the
@@ -29,6 +30,12 @@ export function FilmDetailBody({
    * title/genre-chips/rating block above the poster), so it isn't duplicated
    * the moment this body scrolls into view. */
   hideMeta?: boolean;
+  /** Set true when this body is rendered inside @gorhom/bottom-sheet (the
+   * swipe deck's sheet mode) — its horizontal PeopleRow/HorizontalFilms rows
+   * need a gesture-handler FlatList there to scroll correctly, but that same
+   * swap breaks nested scrolling everywhere else (plain ScrollView contexts
+   * like the standalone film page or the Explore screen), so it's opt-in. */
+  inBottomSheet?: boolean;
 }) {
   const { language } = useLocale();
   const { user } = useAuth();
@@ -166,10 +173,10 @@ export function FilmDetailBody({
         </View>
       )}
 
-      <PeopleRow title={pick(language, "الإخراج", "Director")} people={film.directors ?? []} />
-      <PeopleRow title={pick(language, "التمثيل", "Cast")} people={cast} />
+      <PeopleRow title={pick(language, "الإخراج", "Director")} people={film.directors ?? []} inBottomSheet={inBottomSheet} />
+      <PeopleRow title={pick(language, "التمثيل", "Cast")} people={cast} inBottomSheet={inBottomSheet} />
       {crewGroups.map(([role, people]) => (
-        <PeopleRow key={role} title={role.charAt(0).toUpperCase() + role.slice(1)} people={people} />
+        <PeopleRow key={role} title={role.charAt(0).toUpperCase() + role.slice(1)} people={people} inBottomSheet={inBottomSheet} />
       ))}
 
       {reviews.length > 0 && (
@@ -227,12 +234,14 @@ export function FilmDetailBody({
         <HorizontalFilms
           title={pick(language, "أفلام مقترحة", "You might also like")}
           films={related.recommended.map((f) => ({ tmdb_id: f.tmdb_id, title: f.title, year: f.year, poster_url: f.poster_url, vote_average: f.vote_average }))}
+          inBottomSheet={inBottomSheet}
         />
       )}
       {related && related.more_from_director.length > 0 && (
         <HorizontalFilms
           title={pick(language, "أفلام أخرى للمخرج", "More from the director")}
           films={related.more_from_director.map((f) => ({ tmdb_id: f.tmdb_id, slug: f.slug, title: f.title, year: f.year, poster_url: f.poster_url, vote_average: f.vote_average }))}
+          inBottomSheet={inBottomSheet}
         />
       )}
 
