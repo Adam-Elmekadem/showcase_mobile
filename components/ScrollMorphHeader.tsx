@@ -1,8 +1,7 @@
-import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import React, { useRef } from "react";
+import { View, Text, Pressable, StyleSheet } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedScrollHandler,
   useAnimatedStyle,
@@ -159,6 +158,7 @@ export function ScrollMorphHeader({
   topLeftBadge?: React.ReactNode;
 }) {
   const scrollY = useSharedValue(0);
+  const lastTapRef = useRef(0);
   const heartScale = useSharedValue(0);
   const heartOpacity = useSharedValue(0);
 
@@ -185,32 +185,32 @@ export function ScrollMorphHeader({
     heartOpacity.value = withDelay(350, withTiming(0, { duration: 250 }));
   }
 
-  // Single-vs-double-tap is resolved by the native gesture recognizer
-  // (composed via Exclusive, with the double-tap gesture given first pick)
-  // rather than a JS Date.now()/setTimeout race — the latter is exactly the
-  // kind of thing that misfires under JS-thread contention (e.g. while a
-  // fetch/mount is happening right as the second tap lands), which is a
-  // real failure mode this screen has hit before.
-  const doubleTapGesture = Gesture.Tap()
-    .numberOfTaps(2)
-    .onEnd((_event, success) => {
-      // onEnd fires even when the gesture didn't actually complete (e.g.
-      // this tap got preempted) — without checking `success`, the single
-      // tap below would still fire its handler right after a real double
-      // tap, sending you off to the full detail page unexpectedly.
-      if (!success || !onImageDoubleTap) return;
+  // react-native-gesture-handler's Gesture.Exclusive(Tap, Tap) + runOnJS
+  // combination has real, documented crash reports on Android (software-
+  // mansion/react-native-gesture-handler#2362 and others) — hit exactly
+  // that here (a hard native crash on double-tap), so this reverts to plain
+  // Pressable + a Date.now()/setTimeout race for single-vs-double-tap
+  // disambiguation. It's less precise under heavy JS-thread contention, but
+  // it's a plain touch handler, not the native gesture recognizer, so it
+  // can't crash the app the way the gesture-based version did.
+  function handleImageTap() {
+    const now = Date.now();
+    if (onImageDoubleTap && now - lastTapRef.current < 280) {
+      lastTapRef.current = 0;
       triggerTapBurst();
-      runOnJS(onImageDoubleTap)();
-    });
-
-  const singleTapGesture = Gesture.Tap()
-    .numberOfTaps(1)
-    .onEnd((_event, success) => {
-      if (!success || !onImageTap) return;
-      runOnJS(onImageTap)();
-    });
-
-  const tapGesture = Gesture.Exclusive(doubleTapGesture, singleTapGesture);
+      onImageDoubleTap();
+      return;
+    }
+    lastTapRef.current = now;
+    if (onImageDoubleTap) {
+      setTimeout(() => {
+        if (Date.now() - lastTapRef.current >= 280) return;
+        onImageTap?.();
+      }, 280);
+    } else {
+      onImageTap?.();
+    }
+  }
 
   const collapseRange = Math.max(1, initialHeight - collapsedHeight);
   const effectiveCollapsedBelowHeight = collapsedBelowHeight ?? (collapseBelowOnScroll ? 0 : belowHeight);
@@ -306,17 +306,15 @@ export function ScrollMorphHeader({
         )}
 
         <Animated.View style={[styles.imageBox, imageBoxStyle]}>
-          <GestureDetector gesture={tapGesture}>
-            <View style={StyleSheet.absoluteFill}>
-              {image ? (
-                <Image source={{ uri: image }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
-              ) : (
-                <View style={[StyleSheet.absoluteFill, styles.fallback]}>
-                  <Text style={styles.fallbackText}>{fallbackText ?? title}</Text>
-                </View>
-              )}
-            </View>
-          </GestureDetector>
+          <Pressable style={StyleSheet.absoluteFill} onPress={handleImageTap} disabled={!onImageTap && !onImageDoubleTap}>
+            {image ? (
+              <Image source={{ uri: image }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
+            ) : (
+              <View style={[StyleSheet.absoluteFill, styles.fallback]}>
+                <Text style={styles.fallbackText}>{fallbackText ?? title}</Text>
+              </View>
+            )}
+          </Pressable>
           <Animated.View pointerEvents="none" style={[styles.heartBurst, heartStyle]}>
             <Ionicons name={doubleTapBurstIcon} size={84} color={doubleTapBurstColor ?? colors.paper} />
           </Animated.View>

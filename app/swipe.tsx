@@ -3,8 +3,7 @@ import { View, Text, Pressable, StyleSheet, useWindowDimensions, ActivityIndicat
 import { Image } from "expo-image";
 import PagerView from "react-native-pager-view";
 import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, withDelay, runOnJS } from "react-native-reanimated";
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, withDelay } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter, ImperativeRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -371,6 +370,7 @@ function SheetSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTop
     router
   );
   const sheetRef = useRef<BottomSheet>(null);
+  const lastTapRef = useRef(0);
   const heartScale = useSharedValue(0);
   const heartOpacity = useSharedValue(0);
 
@@ -396,28 +396,25 @@ function SheetSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTop
     heartOpacity.value = withDelay(350, withTiming(0, { duration: 250 }));
   }
 
-  // Resolved by the native gesture recognizer (see the same pattern/reasoning
-  // in ScrollMorphHeader) rather than a JS Date.now()/setTimeout race.
-  const doubleTapGesture = Gesture.Tap()
-    .numberOfTaps(2)
-    .onEnd((_event, success) => {
-      // See the matching comment in ScrollMorphHeader.tsx — onEnd fires even
-      // on a preempted/failed gesture, so checking `success` is what stops
-      // the single-tap navigation below from also firing after a real
-      // double tap.
-      if (!success) return;
+  // react-native-gesture-handler's Gesture.Exclusive(Tap, Tap) + runOnJS
+  // combination has real, documented Android crash reports (software-
+  // mansion/react-native-gesture-handler#2362 and others) — hit exactly
+  // that here (a hard native crash on double-tap), so this reverts to plain
+  // Pressable + a Date.now()/setTimeout race, same as ScrollMorphHeader.
+  function handlePosterTap() {
+    const now = Date.now();
+    if (now - lastTapRef.current < 280) {
+      lastTapRef.current = 0;
       triggerTapBurst();
-      runOnJS(toggleWatched)();
-    });
-
-  const singleTapGesture = Gesture.Tap()
-    .numberOfTaps(1)
-    .onEnd((_event, success) => {
-      if (!success || !resolved) return;
-      runOnJS(router.push)(`/film/${resolved.slug}`);
-    });
-
-  const posterTapGesture = Gesture.Exclusive(doubleTapGesture, singleTapGesture);
+      toggleWatched();
+      return;
+    }
+    lastTapRef.current = now;
+    setTimeout(() => {
+      if (Date.now() - lastTapRef.current >= 280) return;
+      if (resolved) router.push(`/film/${resolved.slug}`);
+    }, 280);
+  }
 
   const heartStyle = useAnimatedStyle(() => ({
     opacity: heartOpacity.value,
@@ -429,29 +426,27 @@ function SheetSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTop
       <View style={styles.sheetCenter}>
         <AboveBlock film={film} showRating={false} />
 
-        <GestureDetector gesture={posterTapGesture}>
-          <View style={[styles.sheetPoster, { width: imageWidth, height: posterHeight }]}>
-            {film.poster_url ?? film.backdrop_url ? (
-              <Image source={{ uri: film.poster_url ?? film.backdrop_url ?? undefined }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
-            ) : (
-              <View style={[StyleSheet.absoluteFill, styles.fallback]}>
-                <Text style={styles.fallbackText}>{film.title}</Text>
-              </View>
-            )}
-            {hasRating && (
-              <View style={styles.posterRatingBadge}>
-                <Ionicons name="star" size={11} color={colors.gold} />
-                <Text style={styles.posterRatingBadgeText}>{film.vote_average!.toFixed(1)}</Text>
-              </View>
-            )}
-            <Animated.View pointerEvents="none" style={[styles.heartBurst, heartStyle]}>
-              <Ionicons name="eye" size={84} color={colors.orange} />
-            </Animated.View>
-            <View pointerEvents="none" style={styles.topLeftBadgeWrap}>
-              <WatchedBadge watchCount={watchCount} />
+        <Pressable onPress={handlePosterTap} style={[styles.sheetPoster, { width: imageWidth, height: posterHeight }]}>
+          {film.poster_url ?? film.backdrop_url ? (
+            <Image source={{ uri: film.poster_url ?? film.backdrop_url ?? undefined }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
+          ) : (
+            <View style={[StyleSheet.absoluteFill, styles.fallback]}>
+              <Text style={styles.fallbackText}>{film.title}</Text>
             </View>
+          )}
+          {hasRating && (
+            <View style={styles.posterRatingBadge}>
+              <Ionicons name="star" size={11} color={colors.gold} />
+              <Text style={styles.posterRatingBadgeText}>{film.vote_average!.toFixed(1)}</Text>
+            </View>
+          )}
+          <Animated.View pointerEvents="none" style={[styles.heartBurst, heartStyle]}>
+            <Ionicons name="eye" size={84} color={colors.orange} />
+          </Animated.View>
+          <View pointerEvents="none" style={styles.topLeftBadgeWrap}>
+            <WatchedBadge watchCount={watchCount} />
           </View>
-        </GestureDetector>
+        </Pressable>
 
         <BelowMenu film={film} watched={watched} logId={logId} liked={liked} router={router} toggleLike={toggleLike} />
 
