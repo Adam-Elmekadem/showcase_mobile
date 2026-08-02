@@ -81,6 +81,7 @@ function RootNavigation() {
       <Stack.Screen name="profile" options={{ title: "Profile" }} />
       <Stack.Screen name="swipe" options={{ headerShown: false, animation: "fade" }} />
       <Stack.Screen name="notifications" options={{ title: "Notifications" }} />
+      <Stack.Screen name="suggestions" options={{ title: "Suggestions" }} />
       <Stack.Screen name="find-friends" options={{ title: "Find friends" }} />
     </Stack>
   );

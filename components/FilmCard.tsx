@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, font } from "@/lib/theme";
 import { api } from "@/lib/api";
 import { setSwipeQueue } from "@/lib/swipeQueue";
+import { SuggestSheet } from "@/components/SuggestSheet";
 
 export type FilmCardData = {
   tmdb_id: number;
@@ -44,6 +45,8 @@ export function FilmCard({
 }) {
   const router = useRouter();
   const [opening, setOpening] = useState(false);
+  const [showSend, setShowSend] = useState(false);
+  const [suggestOpen, setSuggestOpen] = useState(false);
 
   async function openDetail() {
     if (onPress) {
@@ -70,36 +73,59 @@ export function FilmCard({
   }
 
   return (
-    <Pressable style={{ width }} onPress={openDetail}>
-      <View style={[styles.poster, { width, height: width / 0.69 }]}>
-        {film.poster_url ? (
-          <Image source={{ uri: film.poster_url }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
-        ) : (
-          <View style={[StyleSheet.absoluteFill, styles.posterFallback]}>
-            <Text style={styles.posterFallbackText}>{film.title}</Text>
-          </View>
-        )}
-        {opening && (
-          <View style={[StyleSheet.absoluteFill, styles.loadingOverlay]}>
-            <ActivityIndicator color={colors.paper} size="small" />
-          </View>
-        )}
-        {typeof film.vote_average === "number" && film.vote_average > 0 && (
-          <View style={styles.ratingBadge}>
-            <Text style={styles.ratingBadgeText}>{film.vote_average.toFixed(1)}</Text>
-          </View>
-        )}
-        {onToggleWatchlist && (
-          <Pressable style={styles.saveButton} onPress={onToggleWatchlist} hitSlop={8}>
-            <Ionicons name={inWatchlist ? "bookmark" : "bookmark-outline"} size={16} color={inWatchlist ? colors.gold : colors.paper} />
-          </Pressable>
-        )}
-      </View>
-      <Text numberOfLines={1} style={styles.title}>
-        {film.title}
-      </Text>
-      {film.year ? <Text style={styles.year}>{film.year}</Text> : null}
-    </Pressable>
+    <>
+      <Pressable style={{ width }} onPress={openDetail} onLongPress={() => setShowSend(true)} delayLongPress={350}>
+        <View style={[styles.poster, { width, height: width / 0.69 }]}>
+          {film.poster_url ? (
+            <Image source={{ uri: film.poster_url }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
+          ) : (
+            <View style={[StyleSheet.absoluteFill, styles.posterFallback]}>
+              <Text style={styles.posterFallbackText}>{film.title}</Text>
+            </View>
+          )}
+          {opening && (
+            <View style={[StyleSheet.absoluteFill, styles.loadingOverlay]}>
+              <ActivityIndicator color={colors.paper} size="small" />
+            </View>
+          )}
+          {typeof film.vote_average === "number" && film.vote_average > 0 && (
+            <View style={styles.ratingBadge}>
+              <Text style={styles.ratingBadgeText}>{film.vote_average.toFixed(1)}</Text>
+            </View>
+          )}
+          {onToggleWatchlist && (
+            <Pressable style={styles.saveButton} onPress={onToggleWatchlist} hitSlop={8}>
+              <Ionicons name={inWatchlist ? "bookmark" : "bookmark-outline"} size={16} color={inWatchlist ? colors.gold : colors.paper} />
+            </Pressable>
+          )}
+          {/* Long-press reveal, like forwarding a message — tap the backdrop
+              to dismiss, tap the send icon to open the friend picker. */}
+          {showSend && (
+            <Pressable style={[StyleSheet.absoluteFill, styles.sendOverlay]} onPress={() => setShowSend(false)}>
+              <Pressable
+                style={styles.sendButton}
+                hitSlop={12}
+                onPress={() => {
+                  setShowSend(false);
+                  setSuggestOpen(true);
+                }}
+              >
+                <Ionicons name="paper-plane" size={22} color={colors.paper} />
+              </Pressable>
+            </Pressable>
+          )}
+        </View>
+        <Text numberOfLines={1} style={styles.title}>
+          {film.title}
+        </Text>
+        {film.year ? <Text style={styles.year}>{film.year}</Text> : null}
+      </Pressable>
+      <SuggestSheet
+        visible={suggestOpen}
+        onClose={() => setSuggestOpen(false)}
+        suggestable={{ type: "film", tmdbId: film.tmdb_id, title: film.title }}
+      />
+    </>
   );
 }
 
@@ -148,4 +174,13 @@ const styles = StyleSheet.create({
   },
   title: { color: colors.paper, fontSize: 13, fontWeight: "600", marginTop: 8 },
   year: { color: colors.muted, fontSize: 11, marginTop: 2 },
+  sendOverlay: { backgroundColor: "rgba(9,9,16,0.6)", alignItems: "center", justifyContent: "center" },
+  sendButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.green,
+  },
 });

@@ -1,13 +1,18 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator, useWindowDimensions } from "react-native";
 import { Image } from "expo-image";
+import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import { api, ApiPerson, PersonFilmCredit } from "@/lib/api";
 import { useLocale, pick } from "@/lib/i18n";
 import { colors, radius } from "@/lib/theme";
 import { HorizontalFilms } from "@/components/HorizontalFilms";
 
-type PersonDetail = ApiPerson & { filmography: Record<string, PersonFilmCredit[]> };
+type PersonDetail = ApiPerson & {
+  filmography: Record<string, PersonFilmCredit[]>;
+  viewer_watched_director_films?: number;
+  viewer_total_director_films?: number;
+};
 
 const ROLE_LABELS: Record<string, { ar: string; en: string }> = {
   actor: { ar: "أفلام كممثل", en: "Acting" },
@@ -67,6 +72,19 @@ export default function PersonDetailScreen() {
         </View>
       </View>
 
+      {typeof person.viewer_total_director_films === "number" && person.viewer_total_director_films > 0 && (
+        <View style={styles.statBlock}>
+          <Ionicons name="eye-outline" size={14} color={colors.green} />
+          <Text style={styles.statText}>
+            {pick(
+              language,
+              `شاهدت ${person.viewer_watched_director_films ?? 0} من ${person.viewer_total_director_films} فيلمًا من إخراج ${person.name}`,
+              `You've watched ${person.viewer_watched_director_films ?? 0}/${person.viewer_total_director_films} films directed by ${person.name}`
+            )}
+          </Text>
+        </View>
+      )}
+
       {person.biography && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{pick(language, "نبذة", "Biography")}</Text>
@@ -99,6 +117,17 @@ const styles = StyleSheet.create({
   headerText: { flex: 1, gap: 3 },
   name: { color: colors.paper, fontSize: 20, fontWeight: "700" },
   meta: { color: colors.muted, fontSize: 11 },
+  statBlock: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  statText: { color: colors.paperMuted, fontSize: 12, flex: 1 },
   section: { gap: 8 },
   sectionTitle: { color: colors.paperMuted, fontSize: 11, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
   bio: { color: colors.muted, fontSize: 13, lineHeight: 21 },

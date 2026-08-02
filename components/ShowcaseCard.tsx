@@ -1,20 +1,40 @@
-import React from "react";
+import React, { useState } from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radius } from "@/lib/theme";
 import { ApiList } from "@/lib/api";
+import { SuggestSheet } from "@/components/SuggestSheet";
 
 export function ShowcaseCard({ list }: { list: ApiList }) {
   const router = useRouter();
   const posters = (list.items ?? []).slice(0, 4);
+  const [showSend, setShowSend] = useState(false);
+  const [suggestOpen, setSuggestOpen] = useState(false);
 
   return (
     <Pressable
       style={styles.card}
       onPress={() => list.user && router.push(`/showcase/${list.user.username}/${list.slug}`)}
+      onLongPress={() => setShowSend(true)}
+      delayLongPress={350}
     >
+      {showSend && (
+        <Pressable style={[StyleSheet.absoluteFill, styles.sendOverlay]} onPress={() => setShowSend(false)}>
+          <Pressable
+            style={styles.sendButton}
+            hitSlop={12}
+            onPress={() => {
+              setShowSend(false);
+              setSuggestOpen(true);
+            }}
+          >
+            <Ionicons name="paper-plane" size={22} color={colors.paper} />
+          </Pressable>
+        </Pressable>
+      )}
+      <SuggestSheet visible={suggestOpen} onClose={() => setSuggestOpen(false)} suggestable={{ type: "showcase", listId: list.id, title: list.name }} />
       <View style={styles.strip}>
         {posters.length === 0 ? (
           <View style={styles.emptyStrip}>
@@ -69,4 +89,6 @@ const styles = StyleSheet.create({
   avatarText: { color: colors.paperMuted, fontSize: 8, fontWeight: "700" },
   metaText: { color: colors.muted, fontSize: 10, flex: 1 },
   count: { color: colors.muted, fontSize: 10 },
+  sendOverlay: { backgroundColor: "rgba(9,9,16,0.6)", alignItems: "center", justifyContent: "center", zIndex: 10 },
+  sendButton: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: colors.green },
 });

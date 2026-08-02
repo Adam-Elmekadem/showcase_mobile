@@ -179,6 +179,29 @@ export type ApiNotification = {
   created_at: string;
 };
 
+export type ChallengePeriod = "daily" | "weekly" | "monthly" | "yearly";
+
+export type Challenge = {
+  id: number;
+  title: string;
+  description: string | null;
+  period: ChallengePeriod;
+  starts_at: string;
+  ends_at: string;
+  target: number;
+  progress: number;
+};
+
+export type ApiSuggestion = {
+  id: number;
+  message: string | null;
+  read_at: string | null;
+  sender?: ApiUser;
+  film: ApiFilm | null;
+  showcase: ApiList | null;
+  created_at: string;
+};
+
 export type PersonFilmCredit = {
   tmdb_id: number;
   title: string;
@@ -398,7 +421,14 @@ export const api = {
   getWatchProviders: (slug: string, region: string) =>
     request<{ data: WatchProviders }>(`/films/${slug}/watch-providers?region=${encodeURIComponent(region)}`),
 
-  getPerson: (slug: string) => request<{ data: ApiPerson & { filmography: Record<string, PersonFilmCredit[]> } }>(`/people/${slug}`),
+  getPerson: (slug: string) =>
+    request<{
+      data: ApiPerson & {
+        filmography: Record<string, PersonFilmCredit[]>;
+        viewer_watched_director_films?: number;
+        viewer_total_director_films?: number;
+      };
+    }>(`/people/${slug}`),
 
   searchMentions: (q: string, filmId?: number) =>
     request<{ data: { users: MentionUser[]; people: MentionPerson[] } }>(
@@ -436,6 +466,7 @@ export const api = {
   unfollowUser: (username: string) => request<{ data: ApiUser }>(`/users/${username}/follow`, { method: "DELETE" }),
   getFollowers: (username: string) => request<Paginated<ApiUser>>(`/users/${username}/followers`),
   getFollowing: (username: string) => request<Paginated<ApiUser>>(`/users/${username}/following`),
+  getMutuals: () => request<{ data: ApiUser[] }>("/me/mutuals"),
 
   getUserWatchlist: (username: string, perPage?: number) =>
     request<Paginated<ApiFilm>>(`/users/${username}/watchlist${perPage ? `?per_page=${perPage}` : ""}`),
@@ -443,6 +474,17 @@ export const api = {
   getNotifications: () => request<Paginated<ApiNotification>>("/me/notifications"),
   markNotificationRead: (id: number) => request<{ data: ApiNotification }>(`/notifications/${id}/read`, { method: "PATCH" }),
   markAllNotificationsRead: () => request<void>("/me/notifications/read-all", { method: "PATCH" }),
+
+  getChallenges: (period: ChallengePeriod) => request<{ data: Challenge[] }>(`/challenges?period=${period}`),
+
+  getSuggestions: () => request<Paginated<ApiSuggestion>>("/me/suggestions"),
+  sendSuggestion: (username: string, data: { tmdbId?: number; listId?: number; message?: string }) =>
+    request<{ data: ApiSuggestion }>(`/users/${username}/suggestions`, {
+      method: "POST",
+      body: JSON.stringify({ tmdb_id: data.tmdbId, list_id: data.listId, message: data.message }),
+    }),
+  markSuggestionRead: (id: number) => request<{ data: ApiSuggestion }>(`/suggestions/${id}/read`, { method: "PATCH" }),
+  deleteSuggestion: (id: number) => request<void>(`/suggestions/${id}`, { method: "DELETE" }),
 
   getWatchlist: (perPage?: number) => request<Paginated<ApiFilm>>(`/me/watchlist${perPage ? `?per_page=${perPage}` : ""}`),
 

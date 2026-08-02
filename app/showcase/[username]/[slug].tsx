@@ -157,6 +157,19 @@ export default function ShowcaseDetailScreen() {
         </View>
       )}
 
+      {user && list.items && list.items.length > 0 && (
+        <View style={styles.statBlock}>
+          <Ionicons name="eye-outline" size={14} color={colors.green} />
+          <Text style={styles.statText}>
+            {pick(
+              language,
+              `شاهدت ${list.items.filter((i) => i.film.viewer_watched).length} من ${list.items.length} فيلمًا من هذا العرض`,
+              `You've watched ${list.items.filter((i) => i.film.viewer_watched).length}/${list.items.length} films from this showcase`
+            )}
+          </Text>
+        </View>
+      )}
+
       {isOwner && (
         <Pressable style={styles.addFilmButton} onPress={() => setAddSheetOpen(true)}>
           <Ionicons name="add" size={16} color={colors.paper} />
@@ -263,6 +276,17 @@ const styles = StyleSheet.create({
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: 10, paddingVertical: 6 },
   chipText: { color: colors.muted, fontSize: 11 },
+  statBlock: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  statText: { color: colors.paperMuted, fontSize: 12, flex: 1 },
   addFilmButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingVertical: 11 },
   addFilmButtonText: { color: colors.paper, fontSize: 12, fontWeight: "600" },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },

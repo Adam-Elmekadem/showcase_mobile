@@ -10,10 +10,17 @@ const ICONS: Record<string, { active: keyof typeof Ionicons.glyphMap; inactive: 
   community: { active: "people", inactive: "people-outline" },
   showcases: { active: "grid", inactive: "grid-outline" },
   watchlist: { active: "bookmark", inactive: "bookmark-outline" },
+  challenges: { active: "trophy", inactive: "trophy-outline" },
 };
 
 function TabIcon({ routeName, focused, size }: { routeName: string; focused: boolean; size: number }) {
   const icons = ICONS[routeName];
+  // Challenges is deliberately styled differently on request -- a plain
+  // solid-green icon when active, no circular background wrap like the
+  // other four tabs.
+  if (routeName === "challenges") {
+    return <Ionicons name={focused ? icons.active : icons.inactive} size={size} color={focused ? colors.green : colors.paper} />;
+  }
   return (
     <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
       <Ionicons name={focused ? icons.active : icons.inactive} size={size} color={focused ? colors.ink : colors.paper} />
@@ -63,6 +70,13 @@ export default function TabsLayout() {
         options={{
           title: "Watchlist",
           tabBarIcon: ({ focused, size }) => <TabIcon routeName="watchlist" focused={focused} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="challenges"
+        options={{
+          title: "Challenges",
+          tabBarIcon: ({ focused, size }) => <TabIcon routeName="challenges" focused={focused} size={size} />,
         }}
       />
     </Tabs>

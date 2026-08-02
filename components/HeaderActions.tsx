@@ -4,6 +4,7 @@ import { Image } from "expo-image";
 import { useAuth } from "@/lib/auth";
 import { colors } from "@/lib/theme";
 import { NotificationBell } from "@/components/NotificationBell";
+import { SuggestionBell } from "@/components/SuggestionBell";
 import { AccountMenuSheet } from "@/components/AccountMenuSheet";
 
 export function HeaderActions() {
@@ -14,6 +15,7 @@ export function HeaderActions() {
 
   return (
     <View style={styles.row}>
+      <SuggestionBell />
       <NotificationBell />
       <Pressable onPress={() => setMenuOpen(true)} hitSlop={8}>
         <View style={styles.avatar}>
