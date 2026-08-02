@@ -12,10 +12,12 @@ import { FilmCardData } from "@/components/FilmCard";
 import { getSwipeQueue } from "@/lib/swipeQueue";
 import { useLocale, pick } from "@/lib/i18n";
 import { usePreferences } from "@/lib/preferences";
+import { useSuggestReveal } from "@/lib/useSuggestReveal";
 import { colors, radius, font } from "@/lib/theme";
 import { ScrollMorphHeader } from "@/components/ScrollMorphHeader";
 import { FilmDetailBody } from "@/components/FilmDetailBody";
 import { FloatingBackButton } from "@/components/FloatingBackButton";
+import { SuggestSheet } from "@/components/SuggestSheet";
 
 // Rough estimated heights of the above/below pinned content — only used to
 // compute where "centered at rest" sits and to keep the scroll content
@@ -254,6 +256,20 @@ function WatchedBadge({ watchCount }: { watchCount: number }) {
   );
 }
 
+// Long-press reveal, like forwarding a message — tap the backdrop to
+// dismiss, tap the send icon to open the friend picker. Same visual as
+// FilmCard/ShowcaseCard's own overlay, just local to this file since it's
+// used twice here (morph + sheet posters).
+function SendOverlay({ onDismiss, onSend }: { onDismiss: () => void; onSend: () => void }) {
+  return (
+    <Pressable style={[StyleSheet.absoluteFill, styles.sendOverlay]} onPress={onDismiss}>
+      <Pressable style={styles.sendButton} hitSlop={12} onPress={onSend}>
+        <Ionicons name="paper-plane" size={22} color={colors.paper} />
+      </Pressable>
+    </Pressable>
+  );
+}
+
 function AboveBlock({ film, showRating = true }: { film: FilmCardData; showRating?: boolean }) {
   return (
     <View style={styles.aboveBlock}>
@@ -344,6 +360,8 @@ function MorphSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTop
   const router = useRouter();
   const { resolved, loadingDetail, failed, liked, saved, watchCount, fetchDetail, openDetail, toggleLike, toggleWatchlist, toggleWatched } =
     useSwipeCardState(film, isActive, router);
+  const { visible: showSend, reveal: revealSend, dismiss: dismissSend } = useSuggestReveal();
+  const [suggestOpen, setSuggestOpen] = useState(false);
 
   function handleTopStateChange(atTop: boolean) {
     onTopStateChange(atTop);
@@ -362,9 +380,21 @@ function MorphSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTop
         onTopStateChange={handleTopStateChange}
         onImageTap={openDetail}
         onImageDoubleTap={toggleWatched}
+        onImageLongPress={revealSend}
         doubleTapBurstIcon="eye"
         doubleTapBurstColor={colors.orange}
         topLeftBadge={<WatchedBadge watchCount={watchCount} />}
+        imageOverlay={
+          showSend && (
+            <SendOverlay
+              onDismiss={dismissSend}
+              onSend={() => {
+                dismissSend();
+                setSuggestOpen(true);
+              }}
+            />
+          )
+        }
         containerWidth={pageWidth}
         containerHeight={pageHeight}
         centerAtRest
@@ -403,6 +433,11 @@ function MorphSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTop
           <RetryNotice onRetry={fetchDetail} />
         ) : null}
       </ScrollMorphHeader>
+      <SuggestSheet
+        visible={suggestOpen}
+        onClose={() => setSuggestOpen(false)}
+        suggestable={{ type: "film", tmdbId: film.tmdb_id, title: film.title }}
+      />
     </View>
   );
 }
@@ -411,6 +446,8 @@ function SheetSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTop
   const router = useRouter();
   const { resolved, loadingDetail, failed, fetchDetail, liked, saved, watchCount, toggleLike, toggleWatchlist, toggleWatched } =
     useSwipeCardState(film, isActive, router);
+  const { visible: showSend, reveal: revealSend, dismiss: dismissSend } = useSuggestReveal();
+  const [suggestOpen, setSuggestOpen] = useState(false);
   const sheetRef = useRef<BottomSheet>(null);
   const lastTapRef = useRef(0);
   const heartScale = useSharedValue(0);
@@ -468,7 +505,12 @@ function SheetSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTop
       <View style={styles.sheetCenter}>
         <AboveBlock film={film} showRating={false} />
 
-        <Pressable onPress={handlePosterTap} style={[styles.sheetPoster, { width: imageWidth, height: posterHeight }]}>
+        <Pressable
+          onPress={handlePosterTap}
+          onLongPress={revealSend}
+          delayLongPress={350}
+          style={[styles.sheetPoster, { width: imageWidth, height: posterHeight }]}
+        >
           {film.poster_url ?? film.backdrop_url ? (
             <Image source={{ uri: film.poster_url ?? film.backdrop_url ?? undefined }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
           ) : (
@@ -488,6 +530,15 @@ function SheetSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTop
           <View pointerEvents="none" style={styles.topLeftBadgeWrap}>
             <WatchedBadge watchCount={watchCount} />
           </View>
+          {showSend && (
+            <SendOverlay
+              onDismiss={dismissSend}
+              onSend={() => {
+                dismissSend();
+                setSuggestOpen(true);
+              }}
+            />
+          )}
         </Pressable>
 
         <BelowMenu
@@ -525,6 +576,11 @@ function SheetSwipeCard({ film, pageWidth, pageHeight, topInset, isActive, onTop
           ) : null}
         </BottomSheetScrollView>
       </BottomSheet>
+      <SuggestSheet
+        visible={suggestOpen}
+        onClose={() => setSuggestOpen(false)}
+        suggestable={{ type: "film", tmdbId: film.tmdb_id, title: film.title }}
+      />
     </View>
   );
 }
@@ -589,6 +645,8 @@ const styles = StyleSheet.create({
   },
   watchedBadgeActive: { borderColor: colors.orange },
   watchedBadgeText: { color: colors.orange, fontFamily: font.display, fontSize: 13 },
+  sendOverlay: { backgroundColor: "rgba(9,9,16,0.6)", alignItems: "center", justifyContent: "center" },
+  sendButton: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: colors.green },
   fallback: { alignItems: "center", justifyContent: "center", padding: 24, backgroundColor: colors.surface2 },
   fallbackText: { color: colors.muted, fontSize: 16, textAlign: "center", fontFamily: font.display },
   heartBurst: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" },

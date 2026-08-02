@@ -13,6 +13,7 @@ import { FilmCard, FilmCardData, filmCardWidth, filmCardGap } from "@/components
 import { FavoritesSheet } from "@/components/FavoritesSheet";
 import { ShowcaseCard } from "@/components/ShowcaseCard";
 import { AccordionSection } from "@/components/AccordionSection";
+import { QrCodeSheet } from "@/components/QrCodeSheet";
 
 const MAX_FAVORITES = 5;
 const GRID_COLUMNS = 4;
@@ -39,6 +40,7 @@ export default function ProfileScreen() {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [favoritesOpen, setFavoritesOpen] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
 
   const [logs, setLogs] = useState<ApiLog[]>([]);
   const [lists, setLists] = useState<ApiList[]>([]);
@@ -259,7 +261,12 @@ export default function ProfileScreen() {
         <Text style={styles.name}>{user.name}</Text>
         <Text style={styles.username}>@{user.username}</Text>
         {user.bio && <Text style={styles.bio}>{user.bio}</Text>}
+        <Pressable style={styles.qrButton} onPress={() => setQrOpen(true)} hitSlop={8}>
+          <Ionicons name="qr-code-outline" size={14} color={colors.paper} />
+          <Text style={styles.qrButtonText}>{pick(language, "رمز QR", "QR code")}</Text>
+        </Pressable>
       </View>
+      <QrCodeSheet visible={qrOpen} onClose={() => setQrOpen(false)} username={user.username} />
 
       <View style={styles.statsRow}>
         <Stat value={stats?.films_logged ?? user.stats?.films_logged ?? 0} label={pick(language, "أفلام", "Films")} />
@@ -444,6 +451,18 @@ const styles = StyleSheet.create({
   loaderScreen: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.ink },
   content: { padding: 16, paddingBottom: 48, gap: 20 },
   identity: { alignItems: "center", gap: 4 },
+  qrButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  qrButtonText: { color: colors.paper, fontSize: 11, fontWeight: "600" },
   avatarWrap: { width: 88, height: 88, marginBottom: 8 },
   avatar: { width: 88, height: 88, borderRadius: 44, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.borderStrong, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   avatarImage: { width: "100%", height: "100%" },

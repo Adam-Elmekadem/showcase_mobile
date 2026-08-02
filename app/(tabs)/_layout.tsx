@@ -15,17 +15,9 @@ const ICONS: Record<string, { active: keyof typeof Ionicons.glyphMap; inactive: 
 
 function TabIcon({ routeName, focused, size }: { routeName: string; focused: boolean; size: number }) {
   const icons = ICONS[routeName];
-  // Challenges is deliberately styled differently on request -- a plain
-  // solid-green icon when active, no circular background wrap like the
-  // other four tabs.
-  if (routeName === "challenges") {
-    return <Ionicons name={focused ? icons.active : icons.inactive} size={size} color={focused ? colors.green : colors.paper} />;
-  }
-  return (
-    <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
-      <Ionicons name={focused ? icons.active : icons.inactive} size={size} color={focused ? colors.ink : colors.paper} />
-    </View>
-  );
+  // All five tabs: a plain solid-green icon when active, no circular
+  // background wrap.
+  return <Ionicons name={focused ? icons.active : icons.inactive} size={size} color={focused ? colors.green : colors.paper} />;
 }
 
 export default function TabsLayout() {
@@ -110,6 +102,4 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   tabBarItem: { paddingVertical: 10 },
-  iconWrap: { width: 42, height: 42, borderRadius: 111, alignItems: "center", justifyContent: "center" },
-  iconWrapActive: { backgroundColor: colors.green },
 });

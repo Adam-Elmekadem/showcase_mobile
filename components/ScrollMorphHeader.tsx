@@ -72,9 +72,11 @@ export function ScrollMorphHeader({
   crossfadeOverlayTitle = false,
   onImageTap,
   onImageDoubleTap,
+  onImageLongPress,
   doubleTapBurstIcon = "heart",
   doubleTapBurstColor,
   topLeftBadge,
+  imageOverlay,
 }: {
   image: string | null;
   title: string;
@@ -148,6 +150,8 @@ export function ScrollMorphHeader({
   onImageTap?: () => void;
   /** Fires on a double tap of the image (e.g. toggle watched), instead of onImageTap. */
   onImageDoubleTap?: () => void;
+  /** Fires on a long press of the image (e.g. reveal a "suggest to a friend" action). */
+  onImageLongPress?: () => void;
   /** Icon shown in the brief center-screen pulse on double-tap. */
   doubleTapBurstIcon?: React.ComponentProps<typeof Ionicons>["name"];
   /** Color of the double-tap burst icon — defaults to colors.paper. */
@@ -156,6 +160,9 @@ export function ScrollMorphHeader({
    * watched/rewatch-count indicator) — unaffected by scroll, unlike
    * renderAbove/renderBelow. */
   topLeftBadge?: React.ReactNode;
+  /** Full-image overlay (e.g. the long-press "send to a friend" reveal) —
+   * rendered on top of the image, captures its own touches. */
+  imageOverlay?: React.ReactNode;
 }) {
   const scrollY = useSharedValue(0);
   const lastTapRef = useRef(0);
@@ -306,7 +313,13 @@ export function ScrollMorphHeader({
         )}
 
         <Animated.View style={[styles.imageBox, imageBoxStyle]}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={handleImageTap} disabled={!onImageTap && !onImageDoubleTap}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={handleImageTap}
+            onLongPress={onImageLongPress}
+            delayLongPress={350}
+            disabled={!onImageTap && !onImageDoubleTap && !onImageLongPress}
+          >
             {image ? (
               <Image source={{ uri: image }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
             ) : (
@@ -323,6 +336,7 @@ export function ScrollMorphHeader({
               {topLeftBadge}
             </View>
           )}
+          {imageOverlay}
           {showOverlayTitle && (
             <>
               <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.scrim, scrimStyle]} />

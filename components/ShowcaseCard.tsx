@@ -5,28 +5,29 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radius } from "@/lib/theme";
 import { ApiList } from "@/lib/api";
+import { useSuggestReveal } from "@/lib/useSuggestReveal";
 import { SuggestSheet } from "@/components/SuggestSheet";
 
 export function ShowcaseCard({ list }: { list: ApiList }) {
   const router = useRouter();
   const posters = (list.items ?? []).slice(0, 4);
-  const [showSend, setShowSend] = useState(false);
+  const { visible: showSend, reveal: revealSend, dismiss: dismissSend } = useSuggestReveal();
   const [suggestOpen, setSuggestOpen] = useState(false);
 
   return (
     <Pressable
       style={styles.card}
       onPress={() => list.user && router.push(`/showcase/${list.user.username}/${list.slug}`)}
-      onLongPress={() => setShowSend(true)}
+      onLongPress={revealSend}
       delayLongPress={350}
     >
       {showSend && (
-        <Pressable style={[StyleSheet.absoluteFill, styles.sendOverlay]} onPress={() => setShowSend(false)}>
+        <Pressable style={[StyleSheet.absoluteFill, styles.sendOverlay]} onPress={dismissSend}>
           <Pressable
             style={styles.sendButton}
             hitSlop={12}
             onPress={() => {
-              setShowSend(false);
+              dismissSend();
               setSuggestOpen(true);
             }}
           >

@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, font } from "@/lib/theme";
 import { api } from "@/lib/api";
 import { setSwipeQueue } from "@/lib/swipeQueue";
+import { useSuggestReveal } from "@/lib/useSuggestReveal";
 import { SuggestSheet } from "@/components/SuggestSheet";
 
 export type FilmCardData = {
@@ -45,7 +46,7 @@ export function FilmCard({
 }) {
   const router = useRouter();
   const [opening, setOpening] = useState(false);
-  const [showSend, setShowSend] = useState(false);
+  const { visible: showSend, reveal: revealSend, dismiss: dismissSend } = useSuggestReveal();
   const [suggestOpen, setSuggestOpen] = useState(false);
 
   async function openDetail() {
@@ -74,7 +75,7 @@ export function FilmCard({
 
   return (
     <>
-      <Pressable style={{ width }} onPress={openDetail} onLongPress={() => setShowSend(true)} delayLongPress={350}>
+      <Pressable style={{ width }} onPress={openDetail} onLongPress={revealSend} delayLongPress={350}>
         <View style={[styles.poster, { width, height: width / 0.69 }]}>
           {film.poster_url ? (
             <Image source={{ uri: film.poster_url }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
@@ -101,12 +102,12 @@ export function FilmCard({
           {/* Long-press reveal, like forwarding a message — tap the backdrop
               to dismiss, tap the send icon to open the friend picker. */}
           {showSend && (
-            <Pressable style={[StyleSheet.absoluteFill, styles.sendOverlay]} onPress={() => setShowSend(false)}>
+            <Pressable style={[StyleSheet.absoluteFill, styles.sendOverlay]} onPress={dismissSend}>
               <Pressable
                 style={styles.sendButton}
                 hitSlop={12}
                 onPress={() => {
-                  setShowSend(false);
+                  dismissSend();
                   setSuggestOpen(true);
                 }}
               >
