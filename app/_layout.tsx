@@ -16,6 +16,7 @@ import {
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { LocaleProvider } from "@/lib/i18n";
 import { PreferencesProvider } from "@/lib/preferences";
+import { SuggestRevealProvider } from "@/lib/SuggestRevealContext";
 import { colors, font } from "@/lib/theme";
 
 // React Native's own LogBox module uses InteractionManager internally and
@@ -109,7 +110,9 @@ export default function RootLayout() {
           <PreferencesProvider>
             <AuthProvider>
               <StatusBar style="light" />
-              <RootNavigation />
+              <SuggestRevealProvider>
+                <RootNavigation />
+              </SuggestRevealProvider>
             </AuthProvider>
           </PreferencesProvider>
         </LocaleProvider>

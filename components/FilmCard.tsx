@@ -6,7 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, font } from "@/lib/theme";
 import { api } from "@/lib/api";
 import { setSwipeQueue } from "@/lib/swipeQueue";
-import { useSuggestReveal } from "@/lib/useSuggestReveal";
+import { useSuggestReveal } from "@/lib/SuggestRevealContext";
 import { SuggestSheet } from "@/components/SuggestSheet";
 
 export type FilmCardData = {

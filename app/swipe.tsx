@@ -12,7 +12,7 @@ import { FilmCardData } from "@/components/FilmCard";
 import { getSwipeQueue } from "@/lib/swipeQueue";
 import { useLocale, pick } from "@/lib/i18n";
 import { usePreferences } from "@/lib/preferences";
-import { useSuggestReveal } from "@/lib/useSuggestReveal";
+import { useSuggestReveal } from "@/lib/SuggestRevealContext";
 import { colors, radius, font } from "@/lib/theme";
 import { ScrollMorphHeader } from "@/components/ScrollMorphHeader";
 import { FilmDetailBody } from "@/components/FilmDetailBody";
@@ -41,6 +41,33 @@ export default function SwipeScreen() {
   }, [films, startTmdbId]);
 
   const [activeIndex, setActiveIndex] = useState(startIndex);
+  // PagerView mounts every child View passed to it up front, and each
+  // SwipeCard is expensive (Reanimated shared values, a gesture-handler
+  // long-press, and — for the sheet variant — a whole @gorhom/bottom-sheet
+  // instance). Mounting the full queue at once on navigation is exactly
+  // what was blocking the JS thread for ~1-2s before the screen appeared.
+  // Only the pages within one step of wherever the pager has actually been
+  // get a real SwipeCard; everything else stays an empty placeholder View
+  // until swiped near, so opening the screen only ever pays for ~3 cards.
+  const [mountedIndices, setMountedIndices] = useState<Set<number>>(() => {
+    const initial = new Set<number>();
+    for (let i = startIndex - 1; i <= startIndex + 1; i++) {
+      if (i >= 0 && i < films.length) initial.add(i);
+    }
+    return initial;
+  });
+
+  function handlePageSelected(position: number) {
+    setActiveIndex(position);
+    setMountedIndices((prev) => {
+      if (prev.has(position - 1) && prev.has(position) && prev.has(position + 1)) return prev;
+      const next = new Set(prev);
+      for (let i = position - 1; i <= position + 1; i++) {
+        if (i >= 0 && i < films.length) next.add(i);
+      }
+      return next;
+    });
+  }
 
   if (films.length === 0) {
     return (
@@ -57,21 +84,25 @@ export default function SwipeScreen() {
         style={styles.pager}
         initialPage={startIndex}
         scrollEnabled={pagerEnabled}
-        onPageSelected={(e) => setActiveIndex(e.nativeEvent.position)}
+        onPageSelected={(e) => handlePageSelected(e.nativeEvent.position)}
       >
-        {films.map((film, index) => (
-          <View key={String(film.tmdb_id)} style={{ width, height }}>
-            <SwipeCard
-              film={film}
-              pageWidth={width}
-              pageHeight={height}
-              topInset={insets.top}
-              language={language}
-              isActive={index === activeIndex}
-              onTopStateChange={setPagerEnabled}
-            />
-          </View>
-        ))}
+        {films.map((film, index) =>
+          mountedIndices.has(index) ? (
+            <View key={String(film.tmdb_id)} style={{ width, height }}>
+              <SwipeCard
+                film={film}
+                pageWidth={width}
+                pageHeight={height}
+                topInset={insets.top}
+                language={language}
+                isActive={index === activeIndex}
+                onTopStateChange={setPagerEnabled}
+              />
+            </View>
+          ) : (
+            <View key={String(film.tmdb_id)} style={{ width, height }} />
+          )
+        )}
       </PagerView>
       <FloatingBackButton />
     </View>

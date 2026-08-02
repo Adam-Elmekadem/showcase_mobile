@@ -5,7 +5,7 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radius } from "@/lib/theme";
 import { ApiList } from "@/lib/api";
-import { useSuggestReveal } from "@/lib/useSuggestReveal";
+import { useSuggestReveal } from "@/lib/SuggestRevealContext";
 import { SuggestSheet } from "@/components/SuggestSheet";
 
 export function ShowcaseCard({ list }: { list: ApiList }) {
